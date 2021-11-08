@@ -1,2 +1,4 @@
 requirements.txt
 .idea
+__pycache__
+dataset

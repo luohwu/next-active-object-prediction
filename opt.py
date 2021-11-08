@@ -11,7 +11,7 @@ parser = argparse.ArgumentParser(description='training parameters')
 parser.add_argument('--dataset', type=str, default='EPIC',
                     help='EPIC or ADL')
 parser.add_argument('--data_path',
-                    default=os.path.join(current_path,'dataset'),
+                    default='E:\Thesis_workspace\dataset',
                     help='root path of ADL dataset')
 parser.add_argument('--exp_path',
                     default='/media/kaka/HD2T/code/next_active_object/experiments/',
@@ -176,10 +176,11 @@ else:
          'P21P21_03', 'P20P20_01', 'P08P08_01', 'P12P12_05', 'P22P22_15',
          'P26P26_03', 'P06P06_09'}
     train_video_id = id - test_video_id
-
+    args.data_path = os.path.join(args.data_path, 'EPIC')
     val_video_id = test_video_id
     annos_path = 'nao_annotations'
-    frames_path = 'object_detection_images/train'  #
+    # frames_path = 'object_detection_images/train'  #
+    frames_path = 'frames'  #
     features_path = 'EPIC_key_features'
 
     if args.debug:
