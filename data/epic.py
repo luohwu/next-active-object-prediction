@@ -121,6 +121,9 @@ def check_data_annos(args):
     return df_items
 
 
+
+# change dataframes [frame	id	label	nao_bbox] to ['img_file', 'pseudo_track_id',
+#                                      'nao_bbox', 'label', 'bs_idx']
 def make_sequence_dataset(args):
     assert args.mode in ['train', 'val', 'test']
 
@@ -534,7 +537,7 @@ def show(imgs, masks):
 
 if __name__ == '__main__':
     # check_data_annos(args)
-    train_dataset = EpicDataset(args)
+    # train_dataset = EpicDataset(args)
 
     # train_dataset = EpicDatasetV2(args)
     # train_dataset.generate_img_mask_pair()
@@ -549,3 +552,7 @@ if __name__ == '__main__':
     #     # sequence_lens.append(img.shape[0])
     #     # show(img, mask)
     #     # print(img.shape)
+    dirname=os.path.dirname(__file__)
+    print('-'*90)
+    print(dirname)
+    print(args.data_path)

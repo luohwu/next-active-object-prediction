@@ -4,14 +4,14 @@
 
 import argparse
 import random
-
+import os
+current_path=os.path.dirname(__file__)
 parser = argparse.ArgumentParser(description='training parameters')
 
-parser.add_argument('--dataset', type=str, default='ADL',
+parser.add_argument('--dataset', type=str, default='EPIC',
                     help='EPIC or ADL')
 parser.add_argument('--data_path',
-                    # default='/home/kaka/SSD_data/ADL',
-                    default='/media/kaka/HD2T/dataset/EPIC_KITCHENS/data/',
+                    default=os.path.join(current_path,'dataset'),
                     help='root path of ADL dataset')
 parser.add_argument('--exp_path',
                     default='/media/kaka/HD2T/code/next_active_object/experiments/',
@@ -55,7 +55,7 @@ if args.dataset == 'ADL':
     train_video_id = ids_adl - set(val_video_id)
     test_video_id = val_video_id
 
-    args.data_path = '/home/kaka/SSD_data/ADL'
+    args.data_path = os.path.join(args.data_path,'ADL')
     annos_path = 'ADL_annotations/object_annotation'
     annos_path_v2 = 'ADL_annotations/nao_annotation'
     frames_path = 'ADL_key_frames'  # 'ADL_frames'
