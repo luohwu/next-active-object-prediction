@@ -17,8 +17,10 @@ from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms
 
 from opt import *
+import matplotlib.pyplot as plt
+import matplotlib.patches as patches
 
-
+import  cv2
 # train_video_id = list(train_video_id) + list(val_video_id)
 # print(len(train_video_id))
 # train_video_id = {'P01P01_01', 'P01P01_02', 'P01P01_03', 'P01P01_04',
@@ -147,15 +149,26 @@ def make_sequence_dataset(args):
                     generate_pseudo_track_id(annos)  # 生成track_id
 
                     annos.insert(loc=5, column='img_file', value=0)
+                    annos.insert(loc=6, column='video_id', value=0)
+
+                    # annos.insert(loc=6, column='nao_bbox_new',value=0)
+                    # annos['nao_bbox_new']=annos['nao_bbox_new'].astype('object')
                     for index in annos.index:
                         img_file = img_path + '/' + str(
                             annos.loc[index, 'frame']).zfill(
                             10) + '.jpg'
                         annos.loc[index, 'img_file'] = img_file
-
+                        annos.loc[index,'video_id']=annos.loc[index,'id'][3:]
+                        nao_bbox = annos.loc[index, 'nao_bbox']
+                        nao_bbox[0] =round(nao_bbox[0] / 1920. * (456))
+                        nao_bbox[1] =round(nao_bbox[1]/  1080. * (256))
+                        nao_bbox[2] =round(nao_bbox[2]/  1920. * (456))
+                        nao_bbox[3] =round(nao_bbox[3]/  1080. * (256))
+                        # nao_bbox = [round(item) for item in nao_bbox]
+                        # annos.at[index,'nao_bbox_new']=nao_bbox
                     annos_df = pd.DataFrame(annos,
                                             columns=['img_file',
-                                                     'pseudo_track_id',
+                                                     'pseudo_track_id','video_id',
                                                      'nao_bbox', 'label'])
                     df_items = df_items.append(annos_df, ignore_index=True)
 
@@ -524,7 +537,7 @@ class EpicSequenceDataset(Dataset):
 
 
 def show(imgs, masks):
-    import matplotlib.pyplot as plt
+
     for img in imgs:
         for idx in range(img.shape[0]):
             img_ = img[idx, :, :, :].cpu().numpy()
@@ -553,5 +566,23 @@ if __name__ == '__main__':
     #     # show(img, mask)
     #     # print(img.shape)
     data=make_sequence_dataset(args)
-    print(data.head())
-    data.to_csv(args.data_path+'/'+args.dataset+'.csv')
+    # print(data.head())
+    # data.to_csv(args.data_path+'/'+args.dataset+'.csv')
+    #
+    # img_file = 'E:\Thesis_workspace\dataset\EPIC\\frames\P01\P01_02\\frame_0000000241.jpg'
+    # # img = Image.open(img_file).convert('RGB')
+    # img2 = Image.open('E:\Thesis_workspace\dataset\EPIC\\frames\P01\P01_02\\frame_0000000241.jpg').convert('RGB')
+    # img=cv2.imread(img_file)
+    # nao_bbox=[1248/1920.*(456), 0/1080.*(256), 1476/1920.*(456), 136/1080.*(256)]
+    # nao_bbox=[round(coor) for coor in nao_bbox]
+    # # # nao_bbox = [x1, y1, x2, y2]  bbox = df_item.nao_bbox
+    # # fig, ax = plt.subplots()
+    # # ax.imshow(img)
+    # # rect = patches.Rectangle((50, 100), 40, 30, linewidth=1, edgecolor='r', facecolor='none')
+    # #
+    # # plt.show()
+    # # input()
+    # cv2.rectangle(img,(nao_bbox[0],nao_bbox[1]),(nao_bbox[2],nao_bbox[3]),(0,255,0),2)
+    # cv2.imshow('show',img)
+    # cv2.waitKey()
+    # cv2.destroyAllWindows()
