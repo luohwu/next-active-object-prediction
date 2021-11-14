@@ -11,7 +11,7 @@ parser = argparse.ArgumentParser(description='training parameters')
 parser.add_argument('--dataset', type=str, default='EPIC',
                     help='EPIC or ADL')
 parser.add_argument('--data_path',
-                    default='E:\Thesis_workspace\dataset',
+                    default='/home/luohwu/Thesis_workspace/dataset',
                     help='root path of ADL dataset')
 parser.add_argument('--exp_path',
                     default='/media/kaka/HD2T/code/next_active_object/experiments/',
@@ -127,7 +127,7 @@ else:
           'P08P08_18', 'P08P08_19', 'P08P08_20', 'P08P08_21', 'P08P08_22',
           'P08P08_23', 'P08P08_24', 'P08P08_25', 'P08P08_26', 'P08P08_27',
           'P08P08_28', 'P10P10_01', 'P10P10_02', 'P10P10_04', 'P12P12_01',
-          'P12P12_02', 'P12P12_04', 'P12P12_05', 'P12P12_06', 'P12P12_07',
+          'P12P12_02', 'P12P12_04', 'P12P12_07',
           'P13P13_04', 'P13P13_05', 'P13P13_06', 'P13P13_07', 'P13P13_08',
           'P13P13_09', 'P13P13_10', 'P14P14_01', 'P14P14_02', 'P14P14_03',
           'P14P14_04', 'P14P14_05', 'P14P14_07', 'P14P14_09', 'P15P15_01',
@@ -173,8 +173,8 @@ else:
          'P25P25_01', 'P04P04_04', 'P30P30_02', 'P26P26_20', 'P10P10_02',
          'P04P04_06', 'P07P07_02', 'P29P29_01', 'P06P06_02', 'P08P08_05',
          'P05P05_08', 'P07P07_06', 'P26P26_06', 'P31P31_06', 'P13P13_07',
-         'P21P21_03', 'P20P20_01', 'P08P08_01', 'P12P12_05', 'P22P22_15',
-         'P26P26_03', 'P06P06_09'}
+         'P21P21_03', 'P20P20_01', 'P08P08_01', 'P06P06_09', 'P22P22_15',
+         'P26P26_03'}
     train_video_id = id - test_video_id
     args.data_path = os.path.join(args.data_path, 'EPIC')
     val_video_id = test_video_id

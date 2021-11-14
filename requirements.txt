@@ -3,7 +3,6 @@ numpy==1.18.5
 opencv-python==4.3.0.36
 pandas==1.0.5
 pandocfilters==1.4.2
-Pillow @ file:///tmp/build/80754af9/pillow_1594307295532/work
 prefetch-generator==1.0.1
 preshed==3.0.2
 pretrainedmodels==0.7.4
