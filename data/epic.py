@@ -126,203 +126,68 @@ def check_data_annos(args):
 
 # change dataframes [frame	id	label	nao_bbox] to ['img_file', 'pseudo_track_id',
 #                                      'nao_bbox', 'label', 'bs_idx']
-def make_sequence_dataset(args):
-    assert args.mode in ['train', 'val', 'test']
+def make_sequence_dataset(mode='train'):
 
-    print(f'start load {args.mode} data!')
-    df_items = pd.DataFrame(columns=['img_file', 'pseudo_track_id',
-                                     'nao_bbox', 'label'])
-    if args.mode == 'train':
-        for video_id in sorted(train_video_id):
-            if os.path.exists(os.path.join(args.data_path, annos_path,
-                                           'nao_' + video_id + '.csv')):
-                start = time.process_time()
-                img_path = os.path.join(args.data_path, frames_path,
-                                        str(video_id)[:3], str(video_id)[3:])
+    #val is the same as test
+    par_video_id_list=train_video_id if mode=='train' else test_video_id
 
-                anno_name = 'nao_' + video_id + '.csv'
-                anno_path = os.path.join(args.data_path, annos_path, anno_name)
-                annos = pd.read_csv(anno_path,
-                                    converters={"nao_bbox": literal_eval})
-
-                if not annos.empty:
-                    generate_pseudo_track_id(annos)  # 生成track_id
-
-                    annos.insert(loc=5, column='img_file', value=0)
-                    annos.insert(loc=6, column='video_id', value=0)
-
-                    # annos.insert(loc=6, column='nao_bbox_new',value=0)
-                    # annos['nao_bbox_new']=annos['nao_bbox_new'].astype('object')
-                    for index in annos.index:
-                        img_file = img_path + '/' + str(
-                            annos.loc[index, 'frame']).zfill(
-                            10) + '.jpg'
-                        annos.loc[index, 'img_file'] = img_file
-                        annos.loc[index,'video_id']=annos.loc[index,'id'][3:]
-                        nao_bbox = annos.loc[index, 'nao_bbox']
-                        nao_bbox[0] =round(nao_bbox[0] / 1920. * (456))
-                        nao_bbox[1] =round(nao_bbox[1]/  1080. * (256))
-                        nao_bbox[2] =round(nao_bbox[2]/  1920. * (456))
-                        nao_bbox[3] =round(nao_bbox[3]/  1080. * (256))
-                        # nao_bbox = [round(item) for item in nao_bbox]
-                        # annos.at[index,'nao_bbox_new']=nao_bbox
-                    annos_df = pd.DataFrame(annos,
-                                            columns=['img_file',
-                                                     'pseudo_track_id','video_id',
-                                                     'nao_bbox', 'label'])
-                    df_items = df_items.append(annos_df, ignore_index=True)
-
-                end = time.process_time()
-                print(f'finished video {video_id}, time is {end - start}')
-
-        # 生成sequence data
-        for idx, pt_id in enumerate(sorted(df_items.pseudo_track_id.unique())):
-            df_items.loc[df_items.pseudo_track_id == pt_id, 'bs_idx'] = str(idx)
-
-        print('=============================================================')
-        return df_items
-
-    if args.mode == 'val':
-        for video_id in val_video_id:
-            start = time.process_time()
+    print(f'start load {mode} data!')
+    df_items = pd.DataFrame()
+    for video_id in sorted(par_video_id_list):
+        if os.path.exists(os.path.join(args.data_path, annos_path,
+                                       'nao_' + video_id + '.csv')):
+            # start = time.process_time()
             img_path = os.path.join(args.data_path, frames_path,
                                     str(video_id)[:3], str(video_id)[3:])
 
             anno_name = 'nao_' + video_id + '.csv'
             anno_path = os.path.join(args.data_path, annos_path, anno_name)
             annos = pd.read_csv(anno_path,
-                                converters={"nao_bbox": literal_eval})
+                                converters={"nao_bbox": literal_eval,
+                                            "nao_bbox_resized": literal_eval})
 
             if not annos.empty:
                 generate_pseudo_track_id(annos)  # 生成track_id
 
-                annos.insert(loc=5, column='img_file', value=0)
+                # annos.insert(column='img_file', value=0)
+
                 for index in annos.index:
-                    img_file = img_path + '/' + str(
-                        annos.loc[index, 'frame']).zfill(10) + '.jpg'
+                    frame_id=annos.loc[index,'frame']
+                    img_file=os.path.join(img_path,f'frame_{str(frame_id).zfill(10)}.jpg')
                     annos.loc[index, 'img_file'] = img_file
+                    # resized nao_bbox!
+                annos_subset=annos[['img_file',  'pseudo_track_id',
+                                                 'nao_bbox_resized', 'label','hand_bbox']]
+                # annos_df = pd.DataFrame(annos,
+                #                         columns=['img_file',  'pseudo_track_id',
+                #                                  'nao_bbox_resized', 'label','hand_bbox'])
+                df_items = df_items.append(annos_subset)
 
-                annos_df = pd.DataFrame(annos,
-                                        columns=['img_file', 'pseudo_track_id',
-                                                 'nao_bbox', 'label'])
-                df_items = df_items.append(annos_df, ignore_index=False)
+            # end = time.process_time()
+            # df_items=df_items.rename(columns={'nao_bbox_resized':'nao_bbox'})
+            # print(f'finished video {video_id}, time is {end - start}')
 
-            end = time.process_time()
-            print(f'finished video {video_id}, time is {end - start}')
+    # 生成sequence data
+    for idx, pt_id in enumerate(sorted(df_items.pseudo_track_id.unique())):
+        df_items.loc[df_items.pseudo_track_id == pt_id, 'bs_idx'] = str(idx)
 
-            # 生成sequence data
-        for idx, pt_id in enumerate(sorted(df_items.pseudo_track_id.unique())):
-            df_items.loc[df_items.pseudo_track_id == pt_id, 'bs_idx'] = str(idx)
+    df_items = df_items.rename(columns={'nao_bbox_resized': 'nao_bbox'})
+    print('finished')
+    print('=============================================================')
+    return df_items
 
-        print('================================================================')
-        return df_items
-
-    if args.mode == 'test':
-        for video_id in test_video_id:
-            start = time.process_time()
-            img_path = os.path.join(args.data_path, frames_path,
-                                    str(video_id)[:3], str(video_id)[3:])
-
-            anno_name = 'nao_' + video_id + '.csv'
-            anno_path = os.path.join(args.data_path, annos_path, anno_name)
-            annos = pd.read_csv(anno_path, converters={"nao_bbox": literal_eval})
-
-            if not annos.empty:
-                generate_pseudo_track_id(annos)  # 生成track_id
-
-                annos.insert(loc=5, column='img_file', value=0)
-                for index in annos.index:
-                    img_file = img_path + '/' + str(
-                        annos.loc[index, 'frame']).zfill(10) + '.jpg'
-                    annos.loc[index, 'img_file'] = img_file
-
-                annos_df = pd.DataFrame(annos,
-                                        columns=['img_file', 'pseudo_track_id',
-                                                 'nao_bbox', 'label'])
-                df_items = df_items.append(annos_df, ignore_index=False)
-
-            end = time.process_time()
-            print(f'finished video {video_id}, time is {end - start}')
-
-            # 生成sequence data
-        for idx, pt_id in enumerate(sorted(df_items.pseudo_track_id.unique())):
-            df_items.loc[df_items.pseudo_track_id == pt_id, 'bs_idx'] = str(idx)
-
-        print('================================================================')
-        return df_items
-
-
-class EpicDataset(Dataset):
-    def __init__(self, args):
-        self.args = args
-        self.crop = transforms.RandomCrop((args.img_resize[0],
-                                           args.img_resize[1]))
-        self.transform_label = transforms.ToTensor()
-
-        self.data = make_sequence_dataset(args)
-        # pandas的shuffle
-        self.data = self.data.sample(frac=1).reset_index(drop=True)
-
-        if args.normalize:
-            self.transform = transforms.Compose([  # [h, w]
-                transforms.ToTensor(),
-                transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                                     std=[0.229, 0.224, 0.225])  # ImageNet
-            ])
-        else:
-            self.transform = transforms.Compose([
-                transforms.ToTensor()
-            ])
-
-    def __getitem__(self, item):
-        df_item = self.data.iloc[item, :]
-
-        # img_file = df_item.img_file
-        img = Image.open(df_item.img_file).convert('RGB')
-
-        # nao_bbox = [x1, y1, x2, y2]
-        # bbox = df_item.nao_bbox
-        mask = self.generate_mask(img, df_item.nao_bbox)
-        mask = Image.fromarray(mask)
-
-        img = img.resize((self.args.img_resize[1],
-                          self.args.img_resize[0]))
-        mask = mask.resize((self.args.img_resize[1],
-                            self.args.img_resize[0]))
-
-        img = self.transform(img)
-        mask = self.transform_label(mask)[0, :, :]
-        # mask = mask[0, :, :]
-
-        return img, mask
-
-    def __len__(self):  # batch迭代的次数与其有关
-        return self.data.shape[0]
-
-    # def generate_mask(self, bbox):
-    @staticmethod
-    def generate_mask(img, bbox):
-        mask = np.zeros((img.size[1], img.size[0]), dtype=np.float32)
-        mask[bbox[1]:bbox[3], bbox[0]:bbox[2]] = 1
-
-        return mask
 
 
 class EpicDatasetV2(Dataset):
-    def __init__(self, args):
+    def __init__(self, mode='train'):
         self.args = args
         self.crop = transforms.RandomCrop((args.img_resize[0],
                                            args.img_resize[1]))
         self.transform_label = transforms.ToTensor()
 
-        # self.static_hm = self.gen_static_hand_dm()
-        self.hand_hms = pickle.load(open(os.path.join(
-            self.args.data_path, f'{self.args.mode}_hand_hms.pkl'), 'rb'))
+        self.static_hm = self.gen_static_hand_dm()
+        self.data = make_sequence_dataset(mode)
 
-        self.data = pd.read_pickle(os.path.join(
-            self.args.data_path, f'epic_{args.mode}_hand_bbox_df.pkl'))
-        self.data['nao_bbox'] = self.data['nao_bbox'].apply(
-            lambda x: literal_eval(x))
 
         print(f'{args.mode} data: {self.data.shape[0]}')
 
@@ -345,24 +210,26 @@ class EpicDatasetV2(Dataset):
 
         img_file = df_item.img_file
         img = Image.open(img_file).convert('RGB')
-
         # nao_bbox = [x1, y1, x2, y2]  bbox = df_item.nao_bbox
         mask = self.generate_mask(img, df_item.nao_bbox)
         mask = Image.fromarray(mask)
+        # hand_hm = self.hand_hms[img_file]
+        # print(df_item.hand_bbox)
+        if df_item.hand_bbox is np.nan:
+            hand_hm = self.static_hm
+        else:
+            hand_hm = self.generate_hand_hm(img, df_item.hand_bbox)
 
-        hand_hm = self.hand_hms[img_file]
-        # if df_item.hand_bbox is None:
-        #     hand_hm = self.static_hm
-        # else:
-        #     hand_hm = self.generate_hand_hm(img, df_item.hand_bbox)
-        # hand_hm = Image.fromarray(hand_hm)
+        hand_hm = Image.fromarray(hand_hm)
+
 
         img = img.resize((self.args.img_resize[1],
                           self.args.img_resize[0]))
+
         mask = mask.resize((self.args.img_resize[1],
                             self.args.img_resize[0]))
-        # hand_hm = hand_hm.resize((self.args.img_resize[1],
-        #                     self.args.img_resize[0]))
+        hand_hm = hand_hm.resize((self.args.img_resize[1],
+                            self.args.img_resize[0]))
 
         img = self.transform(img)
         mask = self.transform_label(mask)[0, :, :]
@@ -382,22 +249,24 @@ class EpicDatasetV2(Dataset):
 
     @staticmethod
     def generate_hand_hm(img, hand_bbox):
-        im = np.zeros((img.size[0], img.size[1]))
+        hand_bbox=literal_eval(hand_bbox)
+        im = np.zeros((img.size[1], img.size[0]))
+
 
         if len(hand_bbox) > 0:
             points = []
             for box in hand_bbox:
                 points.append((box[0], box[1]))
                 # points.append((box[0], box[3]))
-                points.append((box[1], box[1]))
+                points.append((box[2], box[3]))
                 # points.append((box[1], box[3]))
             points = np.array(points).transpose()
-            im[(points[0]).astype(np.int), (points[1]).astype(np.int)] = 1
+            im[(points[1]), (points[0])] = 1
             im = ndimage.gaussian_filter(im, sigma=img.size[0] / (
                     4. * points.shape[1]))
             im = (im - im.min())/(im.max() - im.min())
 
-        return im.transpose()
+        return im
 
     @staticmethod
     def gen_static_hand_dm():  # 用平均值
@@ -405,10 +274,9 @@ class EpicDatasetV2(Dataset):
         points = [(865, 600), (1189, 600)]
 
         points = np.array(points).transpose()
-        im[(points[0]).astype(np.int), (points[1]).astype(np.int)] = 1
+        im[(points[0]), (points[1])] = 1
         im = ndimage.gaussian_filter(im, sigma=1920 / (4. * points.shape[1]))
         im = (im - im.min()) / (im.max() - im.min())
-
         return im.transpose()
 
     def generate_hms(self):
@@ -552,7 +420,20 @@ if __name__ == '__main__':
     # check_data_annos(args)
     # train_dataset = EpicDataset(args)
 
-    # train_dataset = EpicDatasetV2(args)
+    train_dataset = EpicDatasetV2(mode='train')
+    for i in range(100):
+        img, mask, hand_hm = train_dataset.__getitem__(i)
+        hand_hm=hand_hm.squeeze(0)
+        img_numpy=img.numpy().transpose(1,2,0)
+        cv2.imshow('image',img_numpy)
+        cv2.imshow('image_mask', mask.numpy())
+        cv2.imshow('hand_mask', hand_hm.numpy())
+        cv2.waitKey(0)
+        cv2.destroyAllWindows()
+        print(img.shape)
+        print(mask.shape)
+        print(hand_hm.shape)
+    # train_dataset.data.to_csv('/media/luohwu/T7/dataset/EPIC/test.csv',index=False)
     # train_dataset.generate_img_mask_pair()
     # train_dataset.generate_hm()
     # train_dataset = EpicSequenceDataset(args)
@@ -565,24 +446,3 @@ if __name__ == '__main__':
     #     # sequence_lens.append(img.shape[0])
     #     # show(img, mask)
     #     # print(img.shape)
-    data=make_sequence_dataset(args)
-    # print(data.head())
-    # data.to_csv(args.data_path+'/'+args.dataset+'.csv')
-    #
-    # img_file = 'E:\Thesis_workspace\dataset\EPIC\\frames\P01\P01_02\\frame_0000000241.jpg'
-    # # img = Image.open(img_file).convert('RGB')
-    # img2 = Image.open('E:\Thesis_workspace\dataset\EPIC\\frames\P01\P01_02\\frame_0000000241.jpg').convert('RGB')
-    # img=cv2.imread(img_file)
-    # nao_bbox=[1248/1920.*(456), 0/1080.*(256), 1476/1920.*(456), 136/1080.*(256)]
-    # nao_bbox=[round(coor) for coor in nao_bbox]
-    # # # nao_bbox = [x1, y1, x2, y2]  bbox = df_item.nao_bbox
-    # # fig, ax = plt.subplots()
-    # # ax.imshow(img)
-    # # rect = patches.Rectangle((50, 100), 40, 30, linewidth=1, edgecolor='r', facecolor='none')
-    # #
-    # # plt.show()
-    # # input()
-    # cv2.rectangle(img,(nao_bbox[0],nao_bbox[1]),(nao_bbox[2],nao_bbox[3]),(0,255,0),2)
-    # cv2.imshow('show',img)
-    # cv2.waitKey()
-    # cv2.destroyAllWindows()

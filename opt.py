@@ -11,15 +11,15 @@ parser = argparse.ArgumentParser(description='training parameters')
 parser.add_argument('--dataset', type=str, default='EPIC',
                     help='EPIC or ADL')
 parser.add_argument('--data_path',
-                    default='/home/luohwu/Thesis_workspace/dataset',
+                    default='/media/luohwu/T7/dataset',
                     help='root path of ADL dataset')
 parser.add_argument('--exp_path',
-                    default='/media/kaka/HD2T/code/next_active_object/experiments/',
+                    default='/media/luohwu/T7/experiments/',
                     help='experiment path')
 parser.add_argument('--exp_name', default='exp_name', type=str,
                     help='experiment path')
 
-parser.add_argument('--img_size', default=[480, 640],  # [482, 642]
+parser.add_argument('--img_size', default=[256, 456],  # [482, 642]
                     help='image size: [H, W]')  #
 parser.add_argument('--img_resize', default=[224, 320],  # default=[242, 322]
                     help='image resize: [H, W]')  #
@@ -31,9 +31,9 @@ parser.add_argument('--feature_len', type=int, default=6,
 parser.add_argument('--mode', default='train',
                     help='train , val or test')
 parser.add_argument('--device_ids', nargs='+', default=[0], type=int)
-parser.add_argument('--gpu_ids', default='0', type=str,
+parser.add_argument('--gpu_ids', default=None, type=str,
                     help='gpu_ids: e.g. 0  0,1,2  0,2')
-parser.add_argument('--debug', default=False, help='debug')
+parser.add_argument('--debug', default=True, help='debug')
 parser.add_argument('--print_every', type=int, default=10)
 
 parser.add_argument('--bs', default=1, type=int, help='batch size')
@@ -64,7 +64,7 @@ if args.dataset == 'ADL':
     if args.debug:
         # train_video_id = {'P_01', 'P_02', 'P_03', 'P_04', 'P_05', 'P_06'}
         train_video_id = ['P_02']
-        val_video_id = ['P_18']
+        val_video_id = ['P_02']
         
     action_name = {
         'empty': 0,
@@ -180,10 +180,12 @@ else:
     val_video_id = test_video_id
     annos_path = 'nao_annotations'
     # frames_path = 'object_detection_images/train'  #
-    frames_path = 'frames'  #
+    frames_path = 'rgb_frames'  #
     features_path = 'EPIC_key_features'
 
     if args.debug:
         # train_video_id = {'P_01', 'P_02', 'P_03', 'P_04', 'P_05', 'P_06'}
         train_video_id = ['P01P01_01']
-        val_video_id = ['P31P31_14']
+        val_video_id = ['P01P01_01']
+        test_video_id=['P01P01_01']
+        # val_video_id = ['P31P31_14']

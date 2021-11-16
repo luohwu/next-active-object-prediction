@@ -8,7 +8,7 @@ from itertools import chain
 import cv2
 
 def make_dirs():
-    output_dir='/media/luohwu/T7/EpicKitchen/output_frames_HD'
+    output_dir='/media/luohwu/T7/dataset/EPIC/rgb_frames/'
     video_id_list=sorted(id)
     for video_id in video_id_list:
         participant_id=video_id[0:3]
@@ -34,6 +34,7 @@ def move_tars():
 
 def extract_frames_from_tar(basic_only=False):
     video_id_list=sorted(id)
+    # video_id_list=['P01P01_01']
     tar_data_path='/media/luohwu/T7/EpicKitchen/tarfiles'
     for video_id in video_id_list:
         participant_id=video_id[0:3]
@@ -41,9 +42,9 @@ def extract_frames_from_tar(basic_only=False):
         file_path=os.path.join(tar_data_path,participant_id,f'{video_id}.tar')
         assert os.path.exists(file_path), f"file not exists: {file_path}"
         if basic_only==True:
-            target_dir = os.path.join('/media/luohwu/T7/EpicKitchen/output_frames_basic', participant_id, video_id)
+            target_dir = os.path.join('/media/luohwu/T7/dataset/EPIC/rgb_frames_basic', participant_id, video_id)
         else:
-            target_dir = os.path.join('/media/luohwu/T7/EpicKitchen/output_frames', participant_id, video_id)
+            target_dir = os.path.join('/media/luohwu/T7/dataset/EPIC/rgb_frames', participant_id, video_id)
         tar=tarfile.open(file_path)
         print(f'start extracting: {file_path}')
         # only extract needed frames from tar files.
@@ -74,6 +75,8 @@ def py_files(members,participant_id,video_id,basic_only=False):
     else:
         # original dataset in the baseline method
         all_frames=frames
+    #index start from 0
+    # all_frames=[frame-1 if frame>2 else 1 for frame in all_frames]
     all_frames=[f'frame_{str(frame).zfill(10)}.jpg' for frame in all_frames]
 
     #remove redundant frames
@@ -123,4 +126,4 @@ if __name__=='__main__':
     # move only needed .tar files to our target dir
     # move_tars()
 
-    # extract_frames_from_tar(basic_only=True)
+    extract_frames_from_tar(basic_only=False)

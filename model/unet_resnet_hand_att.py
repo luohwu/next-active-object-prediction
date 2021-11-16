@@ -14,22 +14,25 @@ from model.attention import AttentionBlock
 from opt import *
 
 
+
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 class UNetResnetHandAtt(nn.Module):
     def __init__(self, n_classes=2):
         super(UNetResnetHandAtt, self).__init__()
         self.base_model = UNetResNet18()
-        if args.dataset == 'EPIC':
-            self.base_model.load_state_dict(torch.load(os.path.join(
-                args.exp_path, f'epic/unet_resnet/ckpts/model_epoch_174.pth'),
-                map_location='cpu'))
-        else:
-            self.base_model.load_state_dict(torch.load(os.path.join(
-                args.exp_path, f'adl/unet_resnet/ckpts/model_epoch_1077.pth'),
-                map_location='cpu'))
+        # if args.dataset == 'EPIC':
+        #     self.base_model.load_state_dict(torch.load(os.path.join(
+        #         args.exp_path, f'epic/unet_resnet/ckpts/model_epoch_174.pth'),
+        #         map_location='cpu'))
+        # else:
+        #     self.base_model.load_state_dict(torch.load(os.path.join(
+        #         args.exp_path, f'adl/unet_resnet/ckpts/model_epoch_1077.pth'),
+        #         map_location='cpu'))
         
         print(f'finish loading {args.dataset} model.')
         
-        self.base_model.cuda(device=args.device_ids[0])
+        # self.base_model.cuda(device=args.device_ids[0])
+        self.base_model.to(device)
         
         self.conv_1x1 = nn.Conv2d(1, 2, kernel_size=1, stride=1)
         
