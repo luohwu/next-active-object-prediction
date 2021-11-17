@@ -41,23 +41,24 @@ torch.cuda.manual_seed(SEED)
 exp_name = args.exp_name
 
 TIMESTAMP = "{0:%Y-%m-%dT%H-%M-%S/}".format(datetime.now())
-writer_train = SummaryWriter(os.path.join(args.exp_path, exp_name, 'logs',
-                                          f'train/{TIMESTAMP}'))
-writer_val = SummaryWriter(os.path.join(args.exp_path, exp_name, 'logs',
-                                        f'val/{TIMESTAMP}'))
+# writer_train = SummaryWriter(os.path.join(args.exp_path, exp_name, 'logs',
+#                                           f'train/{TIMESTAMP}'))
+# writer_val = SummaryWriter(os.path.join(args.exp_path, exp_name, 'logs',
+#                                         f'val/{TIMESTAMP}'))
 
 multi_gpu = True if torch.cuda.device_count()>1 else False
+print(f'using {torch.cuda.device_count()} GPUs')
 # device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 device=torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 def main():
     model = UNetResnetHandAtt()
+    for p in model.base_model.parameters():
+        p.requires_grad = False
     # load parameters                      
     # model.load_state_dict(torch.load(
     #     os.path.join(args.exp_path, exp_name,
     #                  f'ckpts/model_epoch_{current_epoch}.pth')))
-    
-    # for p in model.base_model.parameters():
-    #     p.requires_grad = False
+
     
     # model.cuda(device=args.device_ids[0])
     if multi_gpu==True:
@@ -121,25 +122,35 @@ def main():
     
     write_val = open(os.path.join(train_args['ckpt_path'], 'val.txt'), 'w')
 
+    train_loss_list=[]
+    val_loss_list=[]
     current_epoch = 0
     for epoch in range(current_epoch + 1, train_args['epochs'] + 1):
         print(f"==================epoch :{epoch}/{train_args['epochs']}===============================================")
-        val_loss = val(val_dataloader, model, criterion, epoch - 1, write_val)
+        val_loss = val(val_dataloader, model, criterion, epoch, write_val)
         scheduler.step(val_loss)
-        train(train_dataloader, model, criterion, optimizer, epoch, train_args)
-        if epoch %5==0:
-            torch.save(model.state_dict(),os.path.join(train_args['ckpt_path'],
-                                f'model_epoch_{epoch}.pth'))
+        train_loss=train(train_dataloader, model, criterion, optimizer, epoch, train_args)
+        train_loss_list.append(train_loss)
+        val_loss_list.append(val_loss)
+        if epoch % 50==0:
+            checkpoint_path=os.path.join(train_args['ckpt_path'],f'model_epoch_{epoch}.pth')
+            torch.save({'epoch':epoch,
+                        'model_state_dict':model.state_dict(),
+                        'optimizer_state_dict':optimizer.state_dict(),
+                        'val_loss_list':val_loss_list,
+                        'train_loss_list':train_loss_list},
+                       checkpoint_path)
+        print(f'train loss: {train_loss:.8f} | val loss:{val_loss:.8f}')
         # print(f"==================epoch :{epoch}/{train_args['epochs']+1}===============================================")
 
-    
-    writer_train.close()
-    write_val.close()
+
+    # writer_train.close()
+    # write_val.close()
 
 
 def train(train_dataloader, model, criterion, optimizer, epoch, train_args):
     train_losses = 0.
-    curr_iter = (epoch - 1) * len(train_dataloader)
+    # curr_iter = (epoch - 1) * len(train_dataloader)
     
     for i, data in enumerate(train_dataloader, start=1):
         img, mask, hand_hm = data
@@ -169,11 +180,11 @@ def train(train_dataloader, model, criterion, optimizer, epoch, train_args):
         # else:
         #     optimizer.step()
         train_losses += loss.item()
-        
-        curr_iter += 1
-        writer_train.add_scalar("train_loss", train_losses / i, curr_iter)
 
-    print(f"[epoch {epoch}], avg train loss: {train_losses/len(train_dataloader):5f} ")
+        # curr_iter += 1
+        # writer_train.add_scalar("train_loss", train_losses / i, curr_iter)
+    return train_losses/len(train_dataloader)
+    # print(f"[epoch {epoch}], avg train loss: {train_losses/len(train_dataloader):5f} ")
         # if i % train_args['print_every'] == 0:
         #     print(f"[epoch {epoch}], [iter {i} / {len(train_dataloader)}], "
         #           f"[train loss {train_losses / i:5f}]")
@@ -223,11 +234,11 @@ def val(val_dataloader, model, criterion, epoch, write_val):
                          f"[acc {acc_:5f}], [precision {precision:5f}], "
                          f"[recall {recall:5f}], [f1_score {f1_score_:5f}]]\n")
     
-    writer_val.add_scalar('val_loss', val_loss.avg, epoch)
-    writer_val.add_scalar('acc', acc_, epoch)
-    writer_val.add_scalar('precision', precision, epoch)
-    writer_val.add_scalar('recall', recall, epoch)
-    writer_val.add_scalar('f1_score', f1_score_, epoch)
+    # writer_val.add_scalar('val_loss', val_loss.avg, epoch)
+    # writer_val.add_scalar('acc', acc_, epoch)
+    # writer_val.add_scalar('precision', precision, epoch)
+    # writer_val.add_scalar('recall', recall, epoch)
+    # writer_val.add_scalar('f1_score', f1_score_, epoch)
 
     model.train()
     
@@ -236,7 +247,6 @@ def val(val_dataloader, model, criterion, epoch, write_val):
 
 if __name__ == '__main__':
 
-    print(f'{args.euler}AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA')
     if args.euler:
         scratch_path=os.environ['TMPDIR']
         tar_path='/cluster/home/luohwu/dataset.tar.gz'

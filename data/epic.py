@@ -131,7 +131,7 @@ def make_sequence_dataset(mode='train'):
     #val is the same as test
     par_video_id_list=train_video_id if mode=='train' else test_video_id
 
-    print(f'start load {mode} data!')
+    print(f'start load {mode} data, size: {len(par_video_id_list)}')
     df_items = pd.DataFrame()
     for video_id in sorted(par_video_id_list):
         anno_name = 'nao_' + video_id + '.csv'
@@ -191,7 +191,7 @@ class EpicDatasetV2(Dataset):
         self.data = make_sequence_dataset(mode)
 
 
-        print(f'{args.mode} data: {self.data.shape[0]}')
+        # print(f'{mode} data: {self.data.shape[0]}')
 
         # # pandas的shuffle
         self.data = self.data.sample(frac=1).reset_index(drop=True)
