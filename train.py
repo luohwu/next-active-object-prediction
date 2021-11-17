@@ -60,6 +60,8 @@ def main():
     #     p.requires_grad = False
     
     # model.cuda(device=args.device_ids[0])
+    if multi_gpu==True:
+        model=nn.DataParallel(model)
     model=model.to(device)
     
     if args.dataset == 'EPIC':
@@ -99,8 +101,8 @@ def main():
                                                      verbose=True,
                                                      min_lr=0.0000001)
     
-    if multi_gpu:
-        optimizer = nn.DataParallel(optimizer, device_ids=args.device_ids)
+    # if multi_gpu:
+    #     optimizer = nn.DataParallel(optimizer)
     # else:
     # UNet的criterion
     if args.dataset == 'EPIC':
@@ -121,13 +123,14 @@ def main():
 
     current_epoch = 0
     for epoch in range(current_epoch + 1, train_args['epochs'] + 1):
-        print(f"==================epoch :{epoch}/{train_args['epochs']+1}===============================================")
+        print(f"==================epoch :{epoch}/{train_args['epochs']}===============================================")
         val_loss = val(val_dataloader, model, criterion, epoch - 1, write_val)
         scheduler.step(val_loss)
         train(train_dataloader, model, criterion, optimizer, epoch, train_args)
-        print(f"val loss: {val_loss}")
-
-        print(f"==================epoch :{epoch}/{train_args['epochs']+1}===============================================")
+        if epoch %5==0:
+            torch.save(model.state_dict(),os.path.join(train_args['ckpt_path'],
+                                f'model_epoch_{epoch}.pth'))
+        # print(f"==================epoch :{epoch}/{train_args['epochs']+1}===============================================")
 
     
     writer_train.close()
@@ -160,23 +163,20 @@ def train(train_dataloader, model, criterion, optimizer, epoch, train_args):
         # backward
         optimizer.zero_grad()
         loss.backward()
-        # optimizer.step()
-        if multi_gpu:
-            optimizer.module.step()
-        else:
-            optimizer.step()
+        optimizer.step()
+        # if multi_gpu:
+        #     optimizer.module.step()
+        # else:
+        #     optimizer.step()
         train_losses += loss.item()
         
         curr_iter += 1
         writer_train.add_scalar("train_loss", train_losses / i, curr_iter)
-        
-        if i % train_args['print_every'] == 0:
-            print(f"[epoch {epoch}], [iter {i} / {len(train_dataloader)}], "
-                  f"[train loss {train_losses / i:5f}]")
-    
-    # torch.save(model.state_dict(),
-    #            os.path.join(train_args['ckpt_path'],
-    #                         f'model_epoch_{epoch}.pth'))
+
+    print(f"[epoch {epoch}], avg train loss: {train_losses/len(train_dataloader):5f} ")
+        # if i % train_args['print_every'] == 0:
+        #     print(f"[epoch {epoch}], [iter {i} / {len(train_dataloader)}], "
+        #           f"[train loss {train_losses / i:5f}]")
 
 
 def val(val_dataloader, model, criterion, epoch, write_val):
@@ -185,7 +185,7 @@ def val(val_dataloader, model, criterion, epoch, write_val):
     targets_all, predictions_all = [], []
     loader_size=len(val_dataloader)
     for i,data in enumerate(val_dataloader):
-        print(f'{i}/{loader_size}')
+        # print(f'{i}/{loader_size}')
         img, mask, hand_hm = data
         n = img.size(0)
         # img = Variable(img.float().cuda(args.device_ids[0]))
@@ -236,13 +236,16 @@ def val(val_dataloader, model, criterion, epoch, write_val):
 
 if __name__ == '__main__':
 
-    if args.euler==True:
+    print(f'{args.euler}AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA')
+    if args.euler:
         scratch_path=os.environ['TMPDIR']
         tar_path='/cluster/home/luohwu/dataset.tar.gz'
-        assert os.path.exists(tar_path), f'file not exist: tar_path'
+        assert os.path.exists(tar_path), f'file not exist: {tar_path}'
+        print('extracting dataset from tar file')
         tar=tarfile.open(tar_path)
         tar.extractall(os.environ['TMPDIR'])
         tar.close()
+        print('finished')
     # train_data = EpicDatasetV2('train')
 
     main()

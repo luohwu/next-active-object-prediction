@@ -11,8 +11,8 @@ parser = argparse.ArgumentParser(description='training parameters')
 parser.add_argument('--dataset', type=str, default='EPIC',
                     help='EPIC or ADL')
 
-parser.add_argument('--euler', default=False,
-                    help='EPIC or ADL')
+parser.add_argument('--euler', default=False,type=bool,
+                    help='runing on euler or local computer')
 
 # parser.add_argument('--data_path',
 #                     default='/scratch/luohwu/dataset',
@@ -44,7 +44,7 @@ parser.add_argument('--debug', default=True, help='debug')
 parser.add_argument('--print_every', type=int, default=10)
 
 parser.add_argument('--bs', default=1, type=int, help='batch size')
-parser.add_argument('--epochs', default=2000, type=int, help='Number of epochs')
+parser.add_argument('--epochs', default=10, type=int, help='Number of epochs')
 parser.add_argument('--lr', default=0.0000002, type=float, help='learning rate')
 parser.add_argument('--momentum', default=0.9, help='momentum')
 parser.add_argument('--weight_decay', default=0.0005, help='weight decay')
