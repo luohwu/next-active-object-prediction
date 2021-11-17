@@ -134,17 +134,19 @@ def make_sequence_dataset(mode='train'):
     print(f'start load {mode} data!')
     df_items = pd.DataFrame()
     for video_id in sorted(par_video_id_list):
-        if os.path.exists(os.path.join(args.data_path, annos_path,
-                                       'nao_' + video_id + '.csv')):
+        anno_name = 'nao_' + video_id + '.csv'
+        anno_path = os.path.join(args.data_path, annos_path, anno_name)
+        # print(anno_path)
+        # print(os.path.exists(anno_path))
+        if os.path.exists(anno_path):
             # start = time.process_time()
             img_path = os.path.join(args.data_path, frames_path,
                                     str(video_id)[:3], str(video_id)[3:])
 
-            anno_name = 'nao_' + video_id + '.csv'
-            anno_path = os.path.join(args.data_path, annos_path, anno_name)
             annos = pd.read_csv(anno_path,
                                 converters={"nao_bbox": literal_eval,
                                             "nao_bbox_resized": literal_eval})
+            # print(annos.head())
 
             if not annos.empty:
                 generate_pseudo_track_id(annos)  # 生成track_id
@@ -421,18 +423,18 @@ if __name__ == '__main__':
     # train_dataset = EpicDataset(args)
 
     train_dataset = EpicDatasetV2(mode='train')
-    for i in range(100):
-        img, mask, hand_hm = train_dataset.__getitem__(i)
-        hand_hm=hand_hm.squeeze(0)
-        img_numpy=img.numpy().transpose(1,2,0)
-        cv2.imshow('image',img_numpy)
-        cv2.imshow('image_mask', mask.numpy())
-        cv2.imshow('hand_mask', hand_hm.numpy())
-        cv2.waitKey(0)
-        cv2.destroyAllWindows()
-        print(img.shape)
-        print(mask.shape)
-        print(hand_hm.shape)
+    # for i in range(100):
+    #     img, mask, hand_hm = train_dataset.__getitem__(i)
+    #     hand_hm=hand_hm.squeeze(0)
+    #     img_numpy=img.numpy().transpose(1,2,0)
+    #     cv2.imshow('image',img_numpy)
+    #     cv2.imshow('image_mask', mask.numpy())
+    #     cv2.imshow('hand_mask', hand_hm.numpy())
+    #     cv2.waitKey(0)
+    #     cv2.destroyAllWindows()
+    #     print(img.shape)
+    #     print(mask.shape)
+    #     print(hand_hm.shape)
     # train_dataset.data.to_csv('/media/luohwu/T7/dataset/EPIC/test.csv',index=False)
     # train_dataset.generate_img_mask_pair()
     # train_dataset.generate_hm()

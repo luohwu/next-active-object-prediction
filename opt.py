@@ -10,12 +10,19 @@ parser = argparse.ArgumentParser(description='training parameters')
 
 parser.add_argument('--dataset', type=str, default='EPIC',
                     help='EPIC or ADL')
-parser.add_argument('--data_path',
-                    default='/media/luohwu/T7/dataset',
-                    help='root path of ADL dataset')
-parser.add_argument('--exp_path',
-                    default='/media/luohwu/T7/experiments/',
-                    help='experiment path')
+
+parser.add_argument('--euler', default=False,
+                    help='EPIC or ADL')
+
+# parser.add_argument('--data_path',
+#                     default='/scratch/luohwu/dataset',
+#                     # default='/media/luohwu/T7/dataset',
+#                     help='root path of ADL dataset')
+
+# parser.add_argument('--exp_path',
+#                     default='/cluster/home/luohwu/experiments',
+#                     # default='/media/luohwu/T7/experiments/',
+#                     help='experiment path')
 parser.add_argument('--exp_name', default='exp_name', type=str,
                     help='experiment path')
 
@@ -43,6 +50,13 @@ parser.add_argument('--momentum', default=0.9, help='momentum')
 parser.add_argument('--weight_decay', default=0.0005, help='weight decay')
 
 args = parser.parse_args()
+args.data_path='/media/luohwu/T7/dataset' if args.euler==False else os.path.join(os.environ['TMPDIR'],'dataset')
+args.exp_path='/media/luohwu/T7/experiments/' if args.euler==False else '/cluster/home/luohwu/experiments'
+
+# parser.add_argument('--exp_path',
+#                     default='/cluster/home/luohwu/experiments',
+#                     # default='/media/luohwu/T7/experiments/',
+#                     help='experiment path')
 print(args)
 train_args = args.__dict__
 

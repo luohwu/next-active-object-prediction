@@ -16,6 +16,7 @@ from metrics.losses import *
 from metrics.metric import *
 from model.unet_resnet_hand_att import UNetResnetHandAtt
 from opt import *
+import tarfile
 
 ###########################################################################
 # os.environ['CUDA_VISIBLE_DEVICES'] = '4, 5'
@@ -121,9 +122,9 @@ def main():
     current_epoch = 0
     for epoch in range(current_epoch + 1, train_args['epochs'] + 1):
         print(f"==================epoch :{epoch}/{train_args['epochs']+1}===============================================")
-        train(train_dataloader, model, criterion, optimizer, epoch, train_args)
         val_loss = val(val_dataloader, model, criterion, epoch - 1, write_val)
         scheduler.step(val_loss)
+        train(train_dataloader, model, criterion, optimizer, epoch, train_args)
         print(f"val loss: {val_loss}")
 
         print(f"==================epoch :{epoch}/{train_args['epochs']+1}===============================================")
@@ -205,6 +206,7 @@ def val(val_dataloader, model, criterion, epoch, write_val):
         
         # loss = criterion(outputs.permute(0, 2, 3, 1).reshape([-1, 2]),
         #                  mask.flatten())
+        # print(f'outputs size {outputs.shape},  mask size: {mask.shape}')
         loss = criterion(outputs, mask)
         val_loss.update(loss.item(), n)
         
@@ -233,4 +235,14 @@ def val(val_dataloader, model, criterion, epoch, write_val):
 
 
 if __name__ == '__main__':
+
+    if args.euler==True:
+        scratch_path=os.environ['TMPDIR']
+        tar_path='/cluster/home/luohwu/dataset.tar.gz'
+        assert os.path.exists(tar_path), f'file not exist: tar_path'
+        tar=tarfile.open(tar_path)
+        tar.extractall(os.environ['TMPDIR'])
+        tar.close()
+    # train_data = EpicDatasetV2('train')
+
     main()
