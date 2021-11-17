@@ -5,6 +5,7 @@
 import os
 from datetime import datetime
 
+import torch.cuda
 from tensorboardX import SummaryWriter
 from torch import optim
 from torch.utils.data import DataLoader
@@ -44,9 +45,9 @@ writer_train = SummaryWriter(os.path.join(args.exp_path, exp_name, 'logs',
 writer_val = SummaryWriter(os.path.join(args.exp_path, exp_name, 'logs',
                                         f'val/{TIMESTAMP}'))
 
-multi_gpu = False
-
-
+multi_gpu = True if torch.cuda.device_count()>1 else False
+# device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+device=torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 def main():
     model = UNetResnetHandAtt()
     # load parameters                      
@@ -120,11 +121,13 @@ def main():
     current_epoch = 0
     for epoch in range(current_epoch + 1, train_args['epochs'] + 1):
         print(f"==================epoch :{epoch}/{train_args['epochs']+1}===============================================")
+        train(train_dataloader, model, criterion, optimizer, epoch, train_args)
         val_loss = val(val_dataloader, model, criterion, epoch - 1, write_val)
         scheduler.step(val_loss)
+        print(f"val loss: {val_loss}")
+
         print(f"==================epoch :{epoch}/{train_args['epochs']+1}===============================================")
-        
-        train(train_dataloader, model, criterion, optimizer, epoch, train_args)
+
     
     writer_train.close()
     write_val.close()
@@ -142,11 +145,15 @@ def train(train_dataloader, model, criterion, optimizer, epoch, train_args):
         hand_hm = Variable(hand_hm.float().to(device))
         # forward
         outputs = model(img, hand_hm)
+        # print(f'output size:{outputs.shape}')
         # outputs = model(hand_hm)
         del img, hand_hm
         
         # loss = criterion(outputs, mask.long().cuda(args.device_ids[0]))
         loss = criterion(outputs, mask.long().to(device))
+        # print(f'mask shape: {mask.shape}')
+        # print(f'output shape: {outputs.shape}')
+
         del outputs, mask
         
         # backward
@@ -166,9 +173,9 @@ def train(train_dataloader, model, criterion, optimizer, epoch, train_args):
             print(f"[epoch {epoch}], [iter {i} / {len(train_dataloader)}], "
                   f"[train loss {train_losses / i:5f}]")
     
-    torch.save(model.state_dict(),
-               os.path.join(train_args['ckpt_path'],
-                            f'model_epoch_{epoch}.pth'))
+    # torch.save(model.state_dict(),
+    #            os.path.join(train_args['ckpt_path'],
+    #                         f'model_epoch_{epoch}.pth'))
 
 
 def val(val_dataloader, model, criterion, epoch, write_val):
@@ -190,8 +197,9 @@ def val(val_dataloader, model, criterion, epoch, write_val):
         outputs = model(img, hand_hm)
         # outputs = model(hand_hm)
         del img, hand_hm
-        
+        # print(f'output.data size : {outputs.data.shape}')
         predictions_all.append(outputs.data.max(1)[1].cpu().numpy())
+        # print(f'output.data selected size : {outputs.data.max(1)[1].shape}')
         # print(f'{type(mask)}')
         targets_all.append(mask.data.cpu().squeeze(0))
         
@@ -218,7 +226,7 @@ def val(val_dataloader, model, criterion, epoch, write_val):
     writer_val.add_scalar('precision', precision, epoch)
     writer_val.add_scalar('recall', recall, epoch)
     writer_val.add_scalar('f1_score', f1_score_, epoch)
-    
+
     model.train()
     
     return val_loss.avg

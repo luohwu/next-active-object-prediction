@@ -15,7 +15,7 @@ from opt import *
 
 
 
-device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+# device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 class UNetResnetHandAtt(nn.Module):
     def __init__(self, n_classes=2):
         super(UNetResnetHandAtt, self).__init__()
@@ -32,7 +32,7 @@ class UNetResnetHandAtt(nn.Module):
         print(f'finish loading {args.dataset} model.')
         
         # self.base_model.cuda(device=args.device_ids[0])
-        self.base_model.to(device)
+        # self.base_model.to(device)
         
         self.conv_1x1 = nn.Conv2d(1, 2, kernel_size=1, stride=1)
         
@@ -50,6 +50,7 @@ class UNetResnetHandAtt(nn.Module):
         
         x = self.att_block(hand_x, f1)
         x = self.out(torch.cat([f1, x], dim=1))
+
         
         return x
 
