@@ -78,16 +78,15 @@ def main():
                                     shuffle=True, num_workers=2,
                                     pin_memory=True)
     else:
-        train_data = AdlDatasetV2(args)
+        train_data = AdlDatasetV2('train')
         train_dataloader = DataLoader(train_data, batch_size=args.bs,
                                       shuffle=True, num_workers=16,
                                       pin_memory=True)
         
-        val_args = args
-        val_args.mode = 'val'
-        val_data = AdlDatasetV2(val_args)
+
+        val_data = AdlDatasetV2('val')
         val_dataloader = DataLoader(val_data,
-                                    batch_size=val_args.bs,
+                                    batch_size=args.bs,
                                     shuffle=True, num_workers=16,
                                     pin_memory=True)
     

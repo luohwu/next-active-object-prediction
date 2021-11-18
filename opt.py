@@ -40,7 +40,7 @@ parser.add_argument('--mode', default='train',
 parser.add_argument('--device_ids', nargs='+', default=[0], type=int)
 parser.add_argument('--gpu_ids', default=None, type=str,
                     help='gpu_ids: e.g. 0  0,1,2  0,2')
-parser.add_argument('--debug', default=False, help='debug')
+parser.add_argument('--debug', default=True, help='debug')
 parser.add_argument('--print_every', type=int, default=10)
 
 parser.add_argument('--bs', default=32, type=int, help='batch size')
@@ -76,8 +76,9 @@ if args.dataset == 'ADL':
     if args.debug:
         # train_video_id = {'P_01', 'P_02', 'P_03', 'P_04', 'P_05', 'P_06'}
         train_video_id = ['P_02']
-        val_video_id = ['P_02']
-        
+        val_video_id = ['P_03']
+        test_video_id = ['P_03']
+
     action_name = {
         'empty': 0,
         'combing hair': 1,

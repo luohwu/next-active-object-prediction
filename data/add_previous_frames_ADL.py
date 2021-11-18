@@ -57,6 +57,33 @@ def add_previous_frames(sample_time_length=5,sample_fps=3):
                 annotations['nao_bbox_resized'] = annotations.apply(resize_bbox, args=[height, width], axis=1)
                 annotations.to_csv(anno_file_path, index=False)
 
+# original annotation files are .txt files and have different data format from those EPIC annotations
+# conver annotation files to .csv files first
+def convert_format_to_Epic():
+    items = []
+    video_id_list=ids_adl
+
+    for video_id in sorted(video_id_list):
+        img_path = os.path.join(args.data_path, frames_path, video_id)
+
+        anno_name = 'nao_' + video_id + '.txt'
+        anno_name_csv = 'nao_' + video_id + '.csv'
+        anno_file_path = os.path.join(args.data_path, annos_path, anno_name)
+        anno_file_path_csv = os.path.join(args.data_path, annos_path, anno_name_csv)
+        assert  os.path.exists(anno_file_path)
+        annos = pd.read_csv(anno_file_path, header=None,
+                            delim_whitespace=True, converters={0: str},
+                            names=['object_track_id', 'x1', 'y1', 'x2', 'y2',
+                                   'frame_id', 'is_active', 'object_label',
+                                   'is_next_active'])
+
+        annos = annos[annos['is_next_active'] == 1]
+        annos['nao_bbox']=annos.apply(lambda row: [row['x1'], row['y1'], row['x2'], row['y2']],axis=1)
+        annos['id']=video_id
+        annos=annos.rename(columns={"frame_id":"frame","object_label":"label"})
+        annos=annos[['frame','id','label','nao_bbox']]
+        annos.to_csv(anno_file_path_csv,index=False)
 
 if __name__=='__main__':
+    # convert_format_to_Epic()
     add_previous_frames(sample_time_length=5,sample_fps=3)
