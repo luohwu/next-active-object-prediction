@@ -20,28 +20,6 @@ from torchvision import transforms
 from opt import *
 
 
-def generate_next_active_object(df, annos):
-    index0_1 = []
-    index0_1.append(df.index[0])
-    index1_0 = []
-    index1_0.append(df.index[0])
-    for i in range(len(df) - 1):
-        if (df.iloc[i, 6] == 0) & (df.iloc[i + 1, 6] == 1):
-            index0_1.append(df.index[i + 1])
-            # index0_1.append(df.index[i])
-        if (df.iloc[i, 6] == 1) & (df.iloc[i + 1, 6] == 0):
-            index1_0.append(df.index[i + 1])
-
-    if len(index0_1) > 1:
-        if df.iloc[0, 6] == 0:
-            for i in range(len(index0_1) - 1):
-                # print(f'{index0_1[i + 1]}/{index1_0[ i + 1]}')
-                annos.loc[(annos.index >= index1_0[i]) & (
-                        annos.index <= index0_1[i + 1]), 'is_next_active'] = 1
-        if df.iloc[0, 6] == 1:
-            for i in range(len(index0_1) - 1):
-                annos.loc[(annos.index >= index1_0[i + 1]) & (
-                        annos.index <= index0_1[i + 1]), 'is_next_active'] = 1
 
 
 def generate_bbox(df):
@@ -49,353 +27,84 @@ def generate_bbox(df):
     return bbox
 
 
-def make_sequence_dataset(args):
-    assert args.mode in ['train', 'val', 'test']
-
-    print(f'start load {args.mode} data!')
-    # start0 = time.process_time()
-    items = []
-    if args.mode == 'train':
-        for video_id in sorted(train_video_id):
-            start = time.process_time()
-            img_path = os.path.join(args.data_path, frames_path, video_id)
-
-            anno_name = 'object_annot_' + video_id + '.txt'
-            anno_path = os.path.join(args.data_path, annos_path, anno_name)
-            annos = pd.read_csv(anno_path, header=None,
-                                delim_whitespace=True, converters={0: str},
-                                names=['object_track_id', 'x1', 'y1', 'x2', 'y2',
-                                       'frame_id', 'is_active', 'object_label'])
-
-            # 判断next_active_object
-            annos.insert(loc=7, column='is_next_active', value=0)
-            for track_id in sorted(annos.object_track_id.unique()):
-                df = annos[annos['object_track_id'] == track_id]
-                if df.shape[0] == 1:
-                    continue
-                if df.shape[0] > 1:
-                    if (df[df['is_active'] == 1].shape[0] == 0) | (
-                            df[df['is_active'] == 0].shape[0] == 0):
-                        continue
-                        # print(f'{track_id} are all passive or active!')
-                    else:
-                        # print(f'df.shape[0]: {df.shape[0]}')
-                        generate_next_active_object(df, annos)
-
-            annos = annos[annos['is_next_active'] == 1]
-
-            for i, idx in enumerate(annos.index):
-                df = annos.loc[idx, :]
-                # 同一帧图像有多个object, frame_id从0开始, 但ffmpeg得到的图像从1开始
-                img_file = img_path + '/' + str(df.frame_id + 1).zfill(6) + '.jpg'
-                bbox = generate_bbox(df)  # img bbox
-
-                # video_id + '_' + track_id
-                item = (img_file, bbox, video_id + '_' + df.object_track_id,
-                        df.object_label)
-                items.append(item)
-
-            end = time.process_time()
-            print(f'finished video {video_id}, time is {end - start}')
-
-        # 生成带bs_idx的数据
-        df_items = pd.DataFrame(items, columns=['img_file', 'bboxes',
-                                                'track_id', 'label'])
-        del items
-
-        for idx, track_id in enumerate(sorted(df_items.track_id.unique())):
-            df_items.loc[df_items.track_id == track_id, 'bs_idx'] = str(idx)
-
-        # 去掉seq长度为1的数据(bs_idx的个数=1的bs_idx是)
-        bs_idxs_ = df_items.bs_idx.value_counts()[
-            df_items.bs_idx.value_counts() == 1].index
-        df_items = df_items[(~df_items.bs_idx.isin(bs_idxs_))].reset_index(
-            drop=True)
-        # seq长度大于10的数据，cut off掉-10以前的数据
-        bs_idxs_ = df_items.bs_idx.value_counts()[
-            df_items.bs_idx.value_counts() >= 10].index  # 长度大于10的bs_idx
-        df_items_tmp = df_items[(df_items.bs_idx.isin(bs_idxs_))].reset_index(
-            drop=True)  # 长度大于10的数据
-        df_items = df_items[(~df_items.bs_idx.isin(bs_idxs_))].reset_index(
-            drop=True)  # 长度小于10的数据
-        for bs_idx in bs_idxs_:
-            df_tmp = df_items_tmp[df_items_tmp.bs_idx == bs_idx].reset_index(
-                drop=True)
-            df_items = pd.concat([df_items, df_tmp[-8:]], ignore_index=True)
-
-        print('================================================================')
-        return df_items
-
-    if args.mode == 'val':
-        for video_id in val_video_id:
-            start = time.process_time()
-            img_path = os.path.join(args.data_path, frames_path, video_id)
-
-            anno_name = 'object_annot_' + video_id + '.txt'
-            anno_path = os.path.join(args.data_path, annos_path, anno_name)
-            annos = pd.read_csv(anno_path, header=None,
-                                delim_whitespace=True, converters={0: str},
-                                names=['object_track_id', 'x1', 'y1', 'x2', 'y2',
-                                       'frame_id', 'is_active', 'object_label'])
-
-            # 判断next_active_object
-            annos.insert(loc=7, column='is_next_active', value=0)
-            for track_id in sorted(annos.object_track_id.unique()):
-                df = annos[annos['object_track_id'] == track_id]
-                if df.shape[0] == 1:
-                    continue
-                if df.shape[0] > 1:
-                    if (df[df['is_active'] == 1].shape[0] == 0) | (
-                            df[df['is_active'] == 0].shape[0] == 0):
-                        continue
-                        # print(f'{track_id} are all passive or active!')
-                    else:
-                        # print(f'df.shape[0]: {df.shape[0]}')
-                        generate_next_active_object(df, annos)
-
-            annos = annos[annos['is_next_active'] == 1]
-
-            for i, idx in enumerate(annos.index):
-                df = annos.loc[idx, :]
-                # 同一帧图像有多个object, frame_id从0开始, 但ffmpeg得到的图像从1开始
-                img_file = img_path + '/' + str(df.frame_id + 1).zfill(6) + '.jpg'
-                bbox = generate_bbox(df)  # img bbox
-
-                # video_id + '_' + track_id
-                item = (img_file, bbox, video_id + '_' + df.object_track_id,
-                        df.object_label)
-                items.append(item)
-
-            end = time.process_time()
-            print(f'finished video {video_id}, time is {end - start}')
-
-        # 生成
-        df_items = pd.DataFrame(items, columns=['img_file', 'bboxes',
-                                                'track_id', 'label'])
-        del items
-
-        for idx, track_id in enumerate(sorted(df_items.track_id.unique())):
-            df_items.loc[df_items.track_id == track_id, 'bs_idx'] = str(idx)
-
-        # 去掉seq长度为1的数据(bs_idx的个数=1的bs_idx是)
-        bs_idxs_ = df_items.bs_idx.value_counts()[
-            df_items.bs_idx.value_counts() == 1].index
-        df_items = df_items[(~df_items.bs_idx.isin(bs_idxs_))].reset_index(
-            drop=True)
-        # seq长度大于10的数据，cut off掉-10以前的数据
-        bs_idxs_ = df_items.bs_idx.value_counts()[
-            df_items.bs_idx.value_counts() >= 10].index
-        df_items_tmp = df_items[(df_items.bs_idx.isin(bs_idxs_))].reset_index(
-            drop=True)
-        df_items = df_items[(~df_items.bs_idx.isin(bs_idxs_))].reset_index(
-            drop=True)
-        for bs_idx in bs_idxs_:
-            df_tmp = df_items_tmp[df_items_tmp.bs_idx == bs_idx].reset_index(
-                drop=True)
-            df_items = pd.concat([df_items, df_tmp[-8:]], ignore_index=True)
-
-        print('================================================================')
-        return df_items
-
-    if args.mode == 'test':
-        for video_id in test_video_id:
-            start = time.process_time()
-            img_path = os.path.join(args.data_path, frames_path, video_id)
-
-            anno_name = 'object_annot_' + video_id + '.txt'
-            anno_path = os.path.join(args.data_path, annos_path, anno_name)
-            annos = pd.read_csv(anno_path, header=None,
-                                delim_whitespace=True, converters={0: str},
-                                names=['object_track_id', 'x1', 'y1', 'x2', 'y2',
-                                       'frame_id', 'is_active', 'object_label'])
-
-            # 判断next_active_object
-            annos.insert(loc=7, column='is_next_active', value=0)
-            for track_id in sorted(annos.object_track_id.unique()):
-                df = annos[annos['object_track_id'] == track_id]
-                if df.shape[0] == 1:
-                    continue
-                if df.shape[0] > 1:
-                    if (df[df['is_active'] == 1].shape[0] == 0) | (
-                            df[df['is_active'] == 0].shape[0] == 0):
-                        continue
-                        # print(f'{track_id} are all passive or active!')
-                    else:
-                        # print(f'df.shape[0]: {df.shape[0]}')
-                        generate_next_active_object(df, annos)
-
-            annos = annos[annos['is_next_active'] == 1]
-
-            for i, idx in enumerate(annos.index):
-                df = annos.loc[idx, :]
-                # 同一帧图像有多个object, frame_id从0开始, 但ffmpeg得到的图像从1开始
-                img_file = img_path + '/' + str(df.frame_id + 1).zfill(6) + '.jpg'
-                bbox = generate_bbox(df)  # img bbox
-
-                # video_id + '_' + track_id
-                item = (img_file, bbox, video_id + '_' + df.object_track_id,
-                        df.object_label)
-                items.append(item)
-
-            end = time.process_time()
-            print(f'finished video {video_id}, time is {end - start}')
-
-        # 生成sequence data
-        df_items = pd.DataFrame(items, columns=['img_file', 'bboxes',
-                                                'track_id', 'label'])
-        del items
-
-        for idx, track_id in enumerate(sorted(df_items.track_id.unique())):
-            df_items.loc[df_items.track_id == track_id, 'bs_idx'] = str(idx)
-
-        # 去掉seq长度为1的数据(bs_idx的个数=1的bs_idx是)
-        bs_idxs_ = df_items.bs_idx.value_counts()[
-            df_items.bs_idx.value_counts() == 1].index
-        df_items = df_items[(~df_items.bs_idx.isin(bs_idxs_))].reset_index(
-            drop=True)
-        # seq长度大于10的数据，cut off掉-10以前的数据
-        bs_idxs_ = df_items.bs_idx.value_counts()[
-            df_items.bs_idx.value_counts() >= 10].index
-        df_items_tmp = df_items[(df_items.bs_idx.isin(bs_idxs_))].reset_index(
-            drop=True)
-        df_items = df_items[(~df_items.bs_idx.isin(bs_idxs_))].reset_index(
-            drop=True)
-        for bs_idx in bs_idxs_:
-            df_tmp = df_items_tmp[df_items_tmp.bs_idx == bs_idx].reset_index(
-                drop=True)
-            df_items = pd.concat([df_items, df_tmp[-8:]], ignore_index=True)
-
-        print('================================================================')
-        return df_items
 
 
-def make_sequence_dataset_v2(args):
+def make_sequence_dataset_v2(mode):
     """自己标注的adl next active object 数据生成器
     """
-    assert args.mode in ['train', 'val', 'test']
+    assert mode in ['train', 'val', 'test']
 
     print(f'start load {args.mode} data!')
     items = []
-    if args.mode == 'train':
-        for video_id in sorted(train_video_id):
-            start = time.process_time()
-            img_path = os.path.join(args.data_path, frames_path, video_id)
+    video_id_list=train_video_id if mode =='train' else val_video_id
 
-            anno_name = 'nao_' + video_id + '.txt'
-            anno_path = os.path.join(args.data_path, annos_path_v2, anno_name)
-            annos = pd.read_csv(anno_path, header=None,
-                                delim_whitespace=True, converters={0: str},
-                                names=['object_track_id', 'x1', 'y1', 'x2', 'y2',
-                                       'frame_id', 'is_active', 'object_label',
-                                       'is_next_active'])
+    for video_id in sorted(video_id_list):
+        start = time.process_time()
+        img_path = os.path.join(args.data_path, frames_path, video_id)
 
-            annos = annos[annos['is_next_active'] == 1]
+        anno_name = 'nao_' + video_id + '.txt'
+        anno_path = os.path.join(args.data_path, annos_path_v2, anno_name)
+        annos = pd.read_csv(anno_path, header=None,
+                            delim_whitespace=True, converters={0: str},
+                            names=['object_track_id', 'x1', 'y1', 'x2', 'y2',
+                                   'frame_id', 'is_active', 'object_label',
+                                   'is_next_active'])
 
-            for i, idx in enumerate(annos.index):
-                df = annos.loc[idx, :]
-                # 同一帧图像有多个object, frame_id从0开始, 但ffmpeg得到的图像从1开始
-                img_file = img_path + '/' + str(df.frame_id + 1).zfill(6) + '.jpg'
-                bbox = generate_bbox(df)  # img bbox
+        annos = annos[annos['is_next_active'] == 1]
 
-                # video_id + '_' + track_id
-                item = (img_file, bbox, video_id + '_' + df.object_track_id,
-                        df.object_label)
-                items.append(item)
+        for i, idx in enumerate(annos.index):
+            df = annos.loc[idx, :]
+            # 同一帧图像有多个object, frame_id从0开始, 但ffmpeg得到的图像从1开始
+            img_file = img_path + '/' + str(df.frame_id + 1).zfill(6) + '.jpg'
+            bbox = generate_bbox(df)  # img bbox
 
-            end = time.process_time()
-            print(f'finished video {video_id}, time is {end - start}')
+            # video_id + '_' + track_id
+            item = (img_file, bbox, video_id + '_' + df.object_track_id,
+                    df.object_label)
+            items.append(item)
 
-        # 生成带bs_idx的数据
-        df_items = pd.DataFrame(items, columns=['img_file', 'bboxes',
-                                                'track_id', 'label'])
-        del items
+        end = time.process_time()
+        print(f'finished video {video_id}, time is {end - start}')
 
-        for idx, track_id in enumerate(sorted(df_items.track_id.unique())):
-            df_items.loc[df_items.track_id == track_id, 'bs_idx'] = str(idx)
+    # 生成带bs_idx的数据
+    df_items = pd.DataFrame(items, columns=['img_file', 'bboxes',
+                                            'track_id', 'label'])
+    del items
 
-        print('================================================================')
-        return df_items
+    for idx, track_id in enumerate(sorted(df_items.track_id.unique())):
+        df_items.loc[df_items.track_id == track_id, 'bs_idx'] = str(idx)
 
-    if args.mode == 'val':
-        for video_id in val_video_id:
-            start = time.process_time()
-            img_path = os.path.join(args.data_path, frames_path, video_id)
+    print('================================================================')
+    return df_items
 
-            anno_name = 'nao_' + video_id + '.txt'
-            anno_path = os.path.join(args.data_path, annos_path_v2, anno_name)
-            annos = pd.read_csv(anno_path, header=None,
-                                delim_whitespace=True, converters={0: str},
-                                names=['object_track_id', 'x1', 'y1', 'x2', 'y2',
-                                       'frame_id', 'is_active', 'object_label',
-                                       'is_next_active'])
+def convert_format_to_Epic():
 
-            annos = annos[annos['is_next_active'] == 1]
 
-            for i, idx in enumerate(annos.index):
-                df = annos.loc[idx, :]
-                # 同一帧图像有多个object, frame_id从0开始, 但ffmpeg得到的图像从1开始
-                img_file = img_path + '/' + str(df.frame_id + 1).zfill(6) + '.jpg'
-                bbox = generate_bbox(df)  # img bbox
+    items = []
+    video_id_list=ids_adl
 
-                # video_id + '_' + track_id
-                item = (img_file, bbox, video_id + '_' + df.object_track_id,
-                        df.object_label)
-                items.append(item)
+    for video_id in sorted(video_id_list):
+        img_path = os.path.join(args.data_path, frames_path, video_id)
 
-            end = time.process_time()
-            print(f'finished video {video_id}, time is {end - start}')
+        anno_name = 'nao_' + video_id + '.txt'
+        anno_name_csv = 'nao_' + video_id + '.csv'
+        anno_file_path = os.path.join(args.data_path, annos_path, anno_name)
+        anno_file_path_csv = os.path.join(args.data_path, annos_path, anno_name_csv)
+        assert  os.path.exists(anno_file_path)
+        annos = pd.read_csv(anno_file_path, header=None,
+                            delim_whitespace=True, converters={0: str},
+                            names=['object_track_id', 'x1', 'y1', 'x2', 'y2',
+                                   'frame_id', 'is_active', 'object_label',
+                                   'is_next_active'])
 
-        # 生成
-        df_items = pd.DataFrame(items, columns=['img_file', 'bboxes',
-                                                'track_id', 'label'])
-        del items
+        annos = annos[annos['is_next_active'] == 1]
+        annos['nao_bbox']=annos.apply(lambda row: [row['x1'], row['y1'], row['x2'], row['y2']],axis=1)
+        annos['id']=video_id
+        annos=annos.rename(columns={"frame_id":"frame","object_label":"label"})
+        annos=annos[['frame','id','label','nao_bbox']]
+        annos.to_csv(anno_file_path_csv,index=False)
 
-        for idx, track_id in enumerate(sorted(df_items.track_id.unique())):
-            df_items.loc[df_items.track_id == track_id, 'bs_idx'] = str(idx)
-
-        print('================================================================')
-        return df_items
-
-    if args.mode == 'test':
-        for video_id in test_video_id:
-            start = time.process_time()
-            img_path = os.path.join(args.data_path, frames_path, video_id)
-
-            anno_name = 'nao_' + video_id + '.txt'
-            anno_path = os.path.join(args.data_path, annos_path_v2, anno_name)
-            annos = pd.read_csv(anno_path, header=None,
-                                delim_whitespace=True, converters={0: str},
-                                names=['object_track_id', 'x1', 'y1', 'x2', 'y2',
-                                       'frame_id', 'is_active', 'object_label',
-                                       'is_next_active'])
-
-            annos = annos[annos['is_next_active'] == 1]
-
-            for i, idx in enumerate(annos.index):
-                df = annos.loc[idx, :]
-                # 同一帧图像有多个object, frame_id从0开始, 但ffmpeg得到的图像从1开始
-                img_file = img_path + '/' + str(df.frame_id + 1).zfill(6) + '.jpg'
-                bbox = generate_bbox(df)  # img bbox
-
-                # video_id + '_' + track_id
-                item = (img_file, bbox, video_id + '_' + df.object_track_id,
-                        df.object_label)
-                items.append(item)
-
-            end = time.process_time()
-            print(f'finished video {video_id}, time is {end - start}')
-
-        # 生成sequence data
-        df_items = pd.DataFrame(items, columns=['img_file', 'bboxes',
-                                                'track_id', 'label'])
-        del items
-
-        for idx, track_id in enumerate(sorted(df_items.track_id.unique())):
-            df_items.loc[df_items.track_id == track_id, 'bs_idx'] = str(idx)
-
-        print('================================================================')
-        return df_items
-
+        print(annos.head())
 
 class AdlDataset(Dataset):
     def __init__(self, args):
@@ -501,246 +210,9 @@ class AdlDataset(Dataset):
         return df_items
 
 
-class AdlDatasetLabeled(Dataset):
-    def __init__(self, args):
-        self.args = args
-
-        self.data = make_sequence_dataset_v2(args)
-
-        # pandas的shuffle
-        self.data = self.data.sample(frac=1).reset_index(drop=True)
-
-        self.transform_img = transforms.Compose([
-            # transforms.ColorJitter(brightness=0.2, contrast=0.2),
-            transforms.ToTensor(),
-            transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                                 std=[0.229, 0.224, 0.225])
-        ])  # ImageNet
-        self.transform_label = transforms.ToTensor()
-
-    def __getitem__(self, item):
-        df_item = self.data.iloc[item, :]
-
-        img = Image.open(df_item.img_file).convert('RGB')
-        img = img.resize((640, 480), Image.ANTIALIAS)
-        # img.show()
-
-        # bboxes = df_item.bboxes
-        mask = self.generate_mask(df_item.bboxes)
-        mask = Image.fromarray(255 * mask).convert('L')
-
-        # if self.args.mode == 'train':
-        #     img, mask = self.random_scale_crop(img, mask, crop_size=[432, 576])
-
-        img = img.resize((self.args.img_resize[1],
-                          self.args.img_resize[0]))
-        mask = mask.resize((self.args.img_resize[1],
-                            self.args.img_resize[0]))
-
-        # img.show()
-
-        img = self.transform_img(img)
-        mask = self.transform_label(mask)[0, :, :]
-
-        return img, mask
-
-    def __len__(self):  # batch迭代的次数与其有关
-        return self.data.shape[0]
-
-    def generate_mask(self, bbox):
-        # mask = np.zeros(self.args.img_size)
-        # adl数据集给的标签坐标就是在（480， 640）的分辨率下的
-        mask = np.zeros((480, 640), dtype=np.float32)
-
-        # for b in bboxes:
-        if bbox[4] == 1:
-            mask[bbox[1]:bbox[3], bbox[0]:bbox[2]] = 1
-
-        return mask
-
-    def random_scale_crop(self, img, mask, crop_size, angle=30):
-        height, width = crop_size
-        # img, rect = transforms.RandomCrop((h, w))(img)
-        if random.random() > 0.8:
-            i, j, h, w = transforms.RandomCrop.get_params(img, (height, width))
-            img_ = F_trans.crop(img, i, j, h, w)
-            mask_ = F_trans.crop(mask, i, j, h, w)
-        else:
-            img_ = img
-            mask_ = mask
-
-        if random.random() > 0.4:
-            angle_ = transforms.RandomRotation.get_params([-angle, angle])
-            img_ = F_trans.rotate(img_, angle_, resample=Image.NEAREST)
-            mask_ = F_trans.rotate(mask_, angle_, resample=Image.NEAREST)
-        else:
-            img_ = img
-            mask_ = mask
-
-        return img_, mask_
 
 
-class AdlSequenceDataset(Dataset):
-    def __init__(self, args):
-        self.args = args
-        self.crop = transforms.RandomCrop((args.img_resize[0],
-                                           args.img_resize[1]))
-        self.transform_label = transforms.ToTensor()
-        self.data = make_sequence_dataset(args)
 
-        if args.normalize:
-            self.transform = transforms.Compose([  # [h, w]
-                transforms.ToTensor(),
-                # transforms.Normalize(mean=[0.256, 0.341, 0.393],
-                #                      std=[0.212, 0.224, 0.229])
-                transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                                     std=[0.229, 0.224, 0.225])  # ImageNet
-            ])
-        else:
-            self.transform = transforms.Compose([  # [h, w]
-                # transforms.Resize([args.img_resize[0], args.img_resize[1]]),
-                transforms.ToTensor()
-            ])
-
-    def __getitem__(self, item):
-        df_item = self.data[self.data['bs_idx'] == str(item)]
-        # images = torch.FloatTensor(df_item.shape[0], 3, self.args.img_resize[0],
-        #                            self.args.img_resize[1])
-        # masks = torch.FloatTensor(df_item.shape[0], self.args.img_resize[0],
-        #                           self.args.img_resize[1])
-
-        # [sequence_len, channel, H, W]
-        images = torch.FloatTensor(3, 3, self.args.img_resize[0],
-                                   self.args.img_resize[1])
-        masks = torch.FloatTensor(3, self.args.img_resize[0],
-                                  self.args.img_resize[1])
-
-        if df_item.shape[0] == 2:
-            df_item = df_item.append(df_item[-1:])
-        elif (df_item.shape[0] >= 3) & (df_item.shape[0] < 10):
-            df_item = df_item.iloc[[0, math.ceil(df_item.shape[0] / 3),
-                                    df_item.shape[0] - 1]]
-        else:  # df_item.shape[0] >= 10:
-            df_item = df_item[-8:]
-            df_item = df_item.iloc[[0, math.ceil(df_item.shape[0] / 3),
-                                    df_item.shape[0] - 1]]
-        df_item = df_item.reset_index(drop=True)
-
-        for i, idx in enumerate(df_item.index):
-            img_file = df_item.loc[idx, 'img_file']
-            img = Image.open(img_file).convert('RGB')
-            img = img.resize((640, 480), Image.ANTIALIAS)
-
-            bboxes = df_item.loc[idx, 'bboxes']
-
-            mask = self.generate_mask(bboxes)
-            mask = Image.fromarray(mask)
-
-            img = img.resize((self.args.img_resize[1],
-                              self.args.img_resize[0]))
-            mask = mask.resize((self.args.img_resize[1],
-                                self.args.img_resize[0]))
-            img = self.transform(img)
-            mask = self.transform_label(mask)
-            mask = mask[0, :, :]
-
-            images[i, :, :, :] = img
-            masks[i, :, :] = mask
-
-        return images, masks
-
-    def __len__(self):  # batch迭代的次数与其有关
-        return self.data.bs_idx.unique().shape[0]
-
-    def generate_mask(self, bbox):
-        # mask = np.zeros(self.args.img_size)
-        # adl数据集给的标签坐标就是在（480， 640）的分辨率下的
-        mask = np.zeros((480, 640), dtype=np.float32)
-
-        # for b in bboxes:
-        if bbox[4] == 1:
-            mask[bbox[1]:bbox[3], bbox[0]:bbox[2]] = 1
-
-        return mask
-
-
-class AdlSeq3Dataset(Dataset):
-    def __init__(self, args):
-        super(AdlSeq3Dataset, self).__init__()
-        self.args = args
-        self.crop = transforms.RandomCrop((args.img_resize[0],
-                                           args.img_resize[1]))
-        self.transform_label = transforms.ToTensor()
-        # self.data = make_sequence_dataset(args)
-        self.data_path = os.path.join(args.data_path, features_path)
-
-        # load data
-        self.data = pd.read_csv(os.path.join(
-            self.data_path, f'{self.args.mode}_seq_df.csv'))
-        self.data = self.data.sample(frac=1).reset_index(drop=True)
-        self.features = pickle.load(open(os.path.join(
-            self.data_path, f'{self.args.mode}_vgg16_features.pickle'), 'rb'))
-
-        if args.normalize:
-            self.transform = transforms.Compose([  # [h, w]
-                transforms.ToTensor(),
-                # transforms.Normalize(mean=[0.256, 0.341, 0.393],
-                #                      std=[0.212, 0.224, 0.229])
-                transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                                     std=[0.229, 0.224, 0.225])  # ImageNet
-            ])
-        else:
-            self.transform = transforms.Compose([  # [h, w]
-                # transforms.Resize([args.img_resize[0], args.img_resize[1]]),
-                transforms.ToTensor()
-            ])
-
-    def __getitem__(self, item):
-        df_item = self.data[self.data['bs_idx'] == item]
-        feature12 = self.features[f'{item}']
-
-        # [sequence_len, channel, H, W]
-        images = torch.FloatTensor(3, 3, self.args.img_resize[0],
-                                   self.args.img_resize[1])
-        masks = torch.FloatTensor(3, self.args.img_resize[0],
-                                  self.args.img_resize[1])
-        # [num, len, channel, feature_size]
-        features = torch.FloatTensor(2, self.args.feature_len, 512, 70)
-        features[0, :, :, :] = torch.from_numpy(feature12[0])
-        features[1, :, :, :] = torch.from_numpy(feature12[1])
-
-        for i, idx in enumerate(df_item.index):
-            img_file = df_item.loc[idx, 'img_file']
-            img = Image.open(img_file).convert('RGB')
-            # img = img.resize((640, 480), Image.ANTIALIAS)
-
-            bboxes = df_item.loc[idx, 'bboxes']
-            mask = self.generate_mask(bboxes)
-            mask = Image.fromarray(mask)
-
-            img = img.resize((self.args.img_resize[1],
-                              self.args.img_resize[0]))
-            mask = mask.resize((self.args.img_resize[1],
-                                self.args.img_resize[0]))
-
-            img = self.transform(img)
-            mask = self.transform_label(mask)[0, :, :]
-
-            images[i, :, :, :] = img
-            masks[i, :, :] = mask
-
-        return images, masks, features
-
-    def __len__(self):  # batch迭代的次数与其有关
-        return self.data.bs_idx.unique().shape[0]
-
-    @staticmethod
-    def generate_mask(bbox):
-        mask = np.zeros((480, 640), dtype=np.float32)
-        if bbox[4] == 1:
-            mask[bbox[1]:bbox[3], bbox[0]:bbox[2]] = 1
-
-        return mask
 
 
 class AdlDatasetV2(Dataset):
@@ -960,25 +432,26 @@ def plot_seq_count(df, feature):
 
 
 if __name__ == '__main__':
-    import matplotlib.pyplot as plt
-
-    # train_dataset = AdlSequenceDataset(args)
-    # train_dataset = AdlDataset(args)
-    args.mode = 'val'
-    # train_dataset = AdlDatasetLabeled(args)
-    # train_dataset = AdlSeq3Dataset(args)
-    train_dataset = AdlDatasetV2(args)
-    # train_dataset.generate_img_mask_pair()
-    # train_dataset.generate_hms()
-    # train_dataloader = DataLoader(train_dataset)
-    train_dataloader = DataLoader(train_dataset, batch_size=1,
-                                  num_workers=1, shuffle=True)
-    sequence_lens = []
-    for i, data in enumerate(train_dataloader):
-        img, mask = data
-        sequence_lens.append(img.shape[0])
-        show(img, mask)
-        print(img.shape)
+    convert_format_to_Epic()
+    # import matplotlib.pyplot as plt
+    #
+    # # train_dataset = AdlSequenceDataset(args)
+    # # train_dataset = AdlDataset(args)
+    # args.mode = 'val'
+    # # train_dataset = AdlDatasetLabeled(args)
+    # # train_dataset = AdlSeq3Dataset(args)
+    # train_dataset = AdlDatasetV2(args)
+    # # train_dataset.generate_img_mask_pair()
+    # # train_dataset.generate_hms()
+    # # train_dataloader = DataLoader(train_dataset)
+    # train_dataloader = DataLoader(train_dataset, batch_size=1,
+    #                               num_workers=1, shuffle=True)
+    # sequence_lens = []
+    # for i, data in enumerate(train_dataloader):
+    #     img, mask = data
+    #     sequence_lens.append(img.shape[0])
+    #     show(img, mask)
+    #     print(img.shape)
 
 """
 plt.bar(obj_frame['num_object'].array, obj_frame['num_frame'].array)

@@ -8,7 +8,7 @@ import os
 current_path=os.path.dirname(__file__)
 parser = argparse.ArgumentParser(description='training parameters')
 
-parser.add_argument('--dataset', type=str, default='EPIC',
+parser.add_argument('--dataset', type=str, default='ADL',
                     help='EPIC or ADL')
 
 parser.add_argument('--euler', default=False,type=bool,
@@ -70,8 +70,7 @@ if args.dataset == 'ADL':
     test_video_id = val_video_id
 
     args.data_path = os.path.join(args.data_path,'ADL')
-    annos_path = 'ADL_annotations/object_annotation'
-    annos_path_v2 = 'ADL_annotations/nao_annotation'
+    annos_path = 'nao_annotations'
     frames_path = 'ADL_key_frames'  # 'ADL_frames'
     features_path = 'ADL_key_features'
 
