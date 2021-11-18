@@ -97,7 +97,7 @@ def main():
     scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer,
                                                      mode='min',
                                                      factor=0.8,
-                                                     patience=3,
+                                                     patience=5,
                                                      verbose=True,
                                                      min_lr=0.0000001)
     
@@ -126,9 +126,9 @@ def main():
     current_epoch = 0
     for epoch in range(current_epoch + 1, train_args['epochs'] + 1):
         print(f"==================epoch :{epoch}/{train_args['epochs']}===============================================")
+        train_loss = train(train_dataloader, model, criterion, optimizer, epoch, train_args)
         val_loss = val(val_dataloader, model, criterion, epoch, write_val)
         scheduler.step(val_loss)
-        train_loss=train(train_dataloader, model, criterion, optimizer, epoch, train_args)
         train_loss_list.append(train_loss)
         val_loss_list.append(val_loss)
         if epoch % 50==0:
