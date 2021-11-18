@@ -71,9 +71,8 @@ if args.dataset == 'ADL':
 
     args.data_path = os.path.join(args.data_path,'ADL')
     annos_path = 'nao_annotations'
-    frames_path = 'ADL_key_frames'  # 'ADL_frames'
     features_path = 'ADL_key_features'
-
+    frames_path = 'rgb_frames'  #
     if args.debug:
         # train_video_id = {'P_01', 'P_02', 'P_03', 'P_04', 'P_05', 'P_06'}
         train_video_id = ['P_02']
