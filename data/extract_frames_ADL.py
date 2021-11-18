@@ -67,13 +67,13 @@ def extract_frames_from_video(video_id):
 
 if __name__=='__main__':
 
-    print('start extracting frames')
     #create dir for rgb_frames
     # make_dirs()
-    extract_frames_from_video('P_06')
-    # for video_id in ids_adl:
-    #     extract_frames_from_video('video_id')
+    for id in range(7,21):
+        video_id=f'P_{str(id).zfill(2)}'
+        print(f'start extracting frames: {video_id}')
+        extract_frames_from_video(video_id)
+        print('finished')
 
-    print('finished')
 
 
