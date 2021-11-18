@@ -40,11 +40,11 @@ parser.add_argument('--mode', default='train',
 parser.add_argument('--device_ids', nargs='+', default=[0], type=int)
 parser.add_argument('--gpu_ids', default=None, type=str,
                     help='gpu_ids: e.g. 0  0,1,2  0,2')
-parser.add_argument('--debug', default=True, help='debug')
+parser.add_argument('--debug', default=False, help='debug')
 parser.add_argument('--print_every', type=int, default=10)
 
 parser.add_argument('--bs', default=32, type=int, help='batch size')
-parser.add_argument('--epochs', default=2000, type=int, help='Number of epochs')
+parser.add_argument('--epochs', default=5000, type=int, help='Number of epochs')
 # parser.add_argument('--lr', default=0.0000002, type=float, help='learning rate')
 parser.add_argument('--lr', default=0.0003, type=float, help='learning rate')
 parser.add_argument('--momentum', default=0.9, help='momentum')

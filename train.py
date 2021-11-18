@@ -124,6 +124,7 @@ def main():
     train_loss_list=[]
     val_loss_list=[]
     current_epoch = 0
+    epoch_save=50 if args.dataset=='EPIC' else 200
     for epoch in range(current_epoch + 1, train_args['epochs'] + 1):
         print(f"==================epoch :{epoch}/{train_args['epochs']}===============================================")
         train_loss = train(train_dataloader, model, criterion, optimizer, epoch, train_args)
@@ -131,7 +132,7 @@ def main():
         scheduler.step(val_loss)
         train_loss_list.append(train_loss)
         val_loss_list.append(val_loss)
-        if epoch % 50==0:
+        if epoch % epoch_save==0:
             checkpoint_path=os.path.join(train_args['ckpt_path'],f'model_epoch_{epoch}.pth')
             torch.save({'epoch':epoch,
                         'model_state_dict':model.state_dict(),
