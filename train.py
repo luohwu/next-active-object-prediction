@@ -17,6 +17,7 @@ from metrics.metric import *
 from model.unet_resnet_hand_att import UNetResnetHandAtt
 from opt import *
 import tarfile
+from metrics.CIOU import CIOU_LOSS
 
 ###########################################################################
 # os.environ['CUDA_VISIBLE_DEVICES'] = '4, 5'
@@ -80,14 +81,14 @@ def main():
     else:
         train_data = AdlDatasetV2('train')
         train_dataloader = DataLoader(train_data, batch_size=args.bs,
-                                      shuffle=True, num_workers=16,
+                                      shuffle=True, num_workers=2,
                                       pin_memory=True)
         
 
         val_data = AdlDatasetV2('val')
         val_dataloader = DataLoader(val_data,
                                     batch_size=args.bs,
-                                    shuffle=True, num_workers=16,
+                                    shuffle=True, num_workers=2,
                                     pin_memory=True)
     
     optimizer = optim.Adam(model.parameters(),
@@ -111,7 +112,8 @@ def main():
     else:
         # class_weights = torch.FloatTensor([1, 9.35]).cuda(args.device_ids[0])
         class_weights = torch.FloatTensor([1, 9.35]).to(device)
-    criterion = nn.CrossEntropyLoss(class_weights)
+    # criterion = nn.CrossEntropyLoss(class_weights)
+    criterion=CIOU_LOSS()
     # criterion = FocalLoss()
     
     train_args['ckpt_path'] = os.path.join(train_args['exp_path'],
@@ -153,7 +155,7 @@ def train(train_dataloader, model, criterion, optimizer, epoch, train_args):
     # curr_iter = (epoch - 1) * len(train_dataloader)
     
     for i, data in enumerate(train_dataloader, start=1):
-        img, mask, hand_hm = data
+        img, nao_bbox, hand_hm = data
         # img = Variable(img.float().cuda(args.device_ids[0]))
         img = Variable(img.float().to(device))
         # hand_hm = Variable(hand_hm.float().cuda(args.device_ids[0]))
@@ -165,12 +167,13 @@ def train(train_dataloader, model, criterion, optimizer, epoch, train_args):
         del img, hand_hm
         
         # loss = criterion(outputs, mask.long().cuda(args.device_ids[0]))
-        loss = criterion(outputs, mask.long().to(device))
+        loss,_ = criterion(outputs, nao_bbox.to(device))
         # print(f'mask shape: {mask.shape}')
         # print(f'output shape: {outputs.shape}')
 
-        del outputs, mask
-        
+        # del outputs, mask
+        del outputs, nao_bbox
+
         # backward
         optimizer.zero_grad()
         loss.backward()
@@ -183,7 +186,7 @@ def train(train_dataloader, model, criterion, optimizer, epoch, train_args):
 
         # curr_iter += 1
         # writer_train.add_scalar("train_loss", train_losses / i, curr_iter)
-    return train_losses/len(train_dataloader)
+    return train_losses/len(train_dataloader.dataset)
     # print(f"[epoch {epoch}], avg train loss: {train_losses/len(train_dataloader):5f} ")
         # if i % train_args['print_every'] == 0:
         #     print(f"[epoch {epoch}], [iter {i} / {len(train_dataloader)}], "
@@ -193,46 +196,55 @@ def train(train_dataloader, model, criterion, optimizer, epoch, train_args):
 def val(val_dataloader, model, criterion, epoch, write_val):
     model.eval()
     val_loss = AverageMeter()
-    targets_all, predictions_all = [], []
-    loader_size=len(val_dataloader)
+    iou_recorder=AverageMeter()
+    num_correct=0
+    iou_threshold=0.5
+    len_dataset=len(val_dataloader.dataset)
+    # targets_all, predictions_all = [], []
+    # loader_size=len(val_dataloader)
     for i,data in enumerate(val_dataloader):
         # print(f'{i}/{loader_size}')
-        img, mask, hand_hm = data
+        img, nao_bbox_gt, hand_hm = data
         n = img.size(0)
         # img = Variable(img.float().cuda(args.device_ids[0]))
         img = Variable(img.float().to(device))
         # hand_hm = Variable(hand_hm.float().cuda(args.device_ids[0]))
         hand_hm = Variable(hand_hm.float().to(device))
         # mask = mask.long().cuda(args.device_ids[0])
-        mask = mask.long().to(device)
+        # mask = mask.long().to(device)
+        nao_bbox_gt=nao_bbox_gt.to(device)
         # forward
         outputs = model(img, hand_hm)
         # outputs = model(hand_hm)
         del img, hand_hm
         # print(f'output.data size : {outputs.data.shape}')
-        predictions_all.append(outputs.data.max(1)[1].cpu().numpy())
+        # predictions_all.append(outputs.data.max(1)[1].cpu().numpy())
         # print(f'output.data selected size : {outputs.data.max(1)[1].shape}')
         # print(f'{type(mask)}')
-        targets_all.append(mask.data.cpu().squeeze(0))
+        # targets_all.append(nao_bbox.data.cpu().squeeze(0))
         
         # loss = criterion(outputs.permute(0, 2, 3, 1).reshape([-1, 2]),
         #                  mask.flatten())
         # print(f'outputs size {outputs.shape},  mask size: {mask.shape}')
-        loss = criterion(outputs, mask)
+        loss,iou = criterion(outputs, nao_bbox_gt)
+        num_correct+=torch.sum(iou>iou_threshold)
+
         val_loss.update(loss.item(), n)
-        
-        del outputs, mask
+        iou_recorder.update(torch.sum(iou).item(),n)
+        del outputs, nao_bbox_gt
     
-    acc_, precision, recall, f1_score_ = compute_metrics(predictions_all,
-                                                         targets_all)
-    del targets_all, predictions_all
-    print(f'[epoch {epoch}], [val loss {val_loss.avg:5f}], [acc {acc_:5f}], '
-          f'[precision {precision:5f}], [recall {recall:5f}], '
-          f'[f1_score {f1_score_:5f}]')
-    
-    write_val.writelines(f"[epoch {epoch}], "
-                         f"[acc {acc_:5f}], [precision {precision:5f}], "
-                         f"[recall {recall:5f}], [f1_score {f1_score_:5f}]]\n")
+    # acc_, precision, recall, f1_score_ = compute_metrics(predictions_all,
+    #                                                      targets_all)
+    # del targets_all, predictions_all
+    # print(f'[epoch {epoch}], [val loss {val_loss.avg:5f}], [acc {acc_:5f}], '
+    #       f'[precision {precision:5f}], [recall {recall:5f}], '
+    #       f'[f1_score {f1_score_:5f}]')
+    print(f'[epoch {epoch}], [val loss {val_loss.avg:5f}], [IOU avg {iou_recorder.avg:5f}], [acc avg {num_correct/len_dataset}]')
+
+    # write_val.writelines(f"[epoch {epoch}], "
+    #                      f"[acc {acc_:5f}], [precision {precision:5f}], "
+    #                      f"[recall {recall:5f}], [f1_score {f1_score_:5f}]]\n")
+    write_val.writelines(f"[epoch {epoch}], [IOU avg {iou_recorder.avg:5f}],[acc avg {num_correct/len_dataset}] \n")
     
     # writer_val.add_scalar('val_loss', val_loss.avg, epoch)
     # writer_val.add_scalar('acc', acc_, epoch)

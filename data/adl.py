@@ -209,8 +209,8 @@ class AdlDatasetV2(Dataset):
         img_file = df_item.img_file
         img = Image.open(img_file).convert('RGB')
         # nao_bbox = [x1, y1, x2, y2]  bbox = df_item.nao_bbox
-        mask = self.generate_mask(img, df_item.nao_bbox)
-        mask = Image.fromarray(mask)
+        # mask = self.generate_mask(img, df_item.nao_bbox)
+        # mask = Image.fromarray(mask)
         # hand_hm = self.hand_hms[img_file]
         # print(df_item.hand_bbox)
         if df_item.hand_bbox is np.nan:
@@ -224,16 +224,16 @@ class AdlDatasetV2(Dataset):
         img = img.resize((self.args.img_resize[1],
                           self.args.img_resize[0]))
 
-        mask = mask.resize((self.args.img_resize[1],
-                            self.args.img_resize[0]))
+        # mask = mask.resize((self.args.img_resize[1],
+        #                     self.args.img_resize[0]))
         hand_hm = hand_hm.resize((self.args.img_resize[1],
                             self.args.img_resize[0]))
 
         img = self.transform(img)
-        mask = self.transform_label(mask)[0, :, :]
+        # mask = self.transform_label(mask)[0, :, :]
         hand_hm = self.transform_label(hand_hm)
 
-        return img, mask, hand_hm
+        return img, torch.tensor(df_item.nao_bbox), hand_hm
 
     def __len__(self):  # batch迭代的次数与其有关
         return self.data.shape[0]
@@ -324,7 +324,20 @@ if __name__ == '__main__':
     # train_dataset = EpicDataset(args)
 
     train_dataset = AdlDatasetV2(mode='train')
-    train_dataset.data.to_csv('/media/luohwu/T7/dataset/ADL/test.csv',index=False)
+
+    train_dataloader = DataLoader(train_dataset, batch_size=4,
+                                  num_workers=3, shuffle=False)
+    print(len(train_dataloader.dataset),train_dataset.__len__())
+    # for data in train_dataloader:
+    it=iter(train_dataloader)
+    nao_bbox_list=[]
+    img,nao_bbox,hand_hm=next(it)
+    nao_bbox_list.append(nao_bbox)
+    nao_bbox_list.append(nao_bbox)
+    print(nao_bbox.shape)
+    nao_bbox_total=torch.cat(nao_bbox_list,0)
+    print(nao_bbox_total.shape)
+    # train_dataset.data.to_csv('/media/luohwu/T7/dataset/ADL/test.csv',index=False)
     # for i in range(100):
     #     img, mask, hand_hm = train_dataset.__getitem__(i)
     #     hand_hm=hand_hm.squeeze(0)
