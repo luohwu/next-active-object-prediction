@@ -43,13 +43,6 @@ class UNetResnetHandAtt(nn.Module):
                                  nn.ReLU(),
                                  nn.Conv2d(64, n_classes, kernel_size=1,
                                            stride=1))
-        self.bbox_model=nn.Sequential(nn.ReLU(),
-                                      nn.Conv2d(n_classes,n_classes,kernel_size=2,stride=2),
-                                      nn.AvgPool2d((4,4)),
-                                      nn.ReLU(),
-                                      nn.Flatten(1),
-                                      nn.Linear(2240,4)
-                                      )
     
     def forward(self, x, hand_x):
         _, f1 = self.base_model(x, with_output_feature_map=True)
@@ -58,7 +51,7 @@ class UNetResnetHandAtt(nn.Module):
         x = self.att_block(hand_x, f1)
         x = self.out(torch.cat([f1, x], dim=1))
         # print(f'x shape',x.shape)
-        x=self.bbox_model(x)
+        # x=self.bbox_model(x)
         # print('x shape',x.shape)
 
         

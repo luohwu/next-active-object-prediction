@@ -209,8 +209,8 @@ class AdlDatasetV2(Dataset):
         img_file = df_item.img_file
         img = Image.open(img_file).convert('RGB')
         # nao_bbox = [x1, y1, x2, y2]  bbox = df_item.nao_bbox
-        # mask = self.generate_mask(img, df_item.nao_bbox)
-        # mask = Image.fromarray(mask)
+        mask = self.generate_mask(img, df_item.nao_bbox)
+        mask = Image.fromarray(mask)
         # hand_hm = self.hand_hms[img_file]
         # print(df_item.hand_bbox)
         if df_item.hand_bbox is np.nan:
@@ -224,16 +224,16 @@ class AdlDatasetV2(Dataset):
         img = img.resize((self.args.img_resize[1],
                           self.args.img_resize[0]))
 
-        # mask = mask.resize((self.args.img_resize[1],
-        #                     self.args.img_resize[0]))
+        mask = mask.resize((self.args.img_resize[1],
+                            self.args.img_resize[0]))
         hand_hm = hand_hm.resize((self.args.img_resize[1],
                             self.args.img_resize[0]))
 
         img = self.transform(img)
-        # mask = self.transform_label(mask)[0, :, :]
+        mask = self.transform_label(mask)[0, :, :]
         hand_hm = self.transform_label(hand_hm)
 
-        return img, torch.tensor(df_item.nao_bbox), hand_hm
+        return img, mask, hand_hm
 
     def __len__(self):  # batch迭代的次数与其有关
         return self.data.shape[0]
