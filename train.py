@@ -81,14 +81,14 @@ def main():
     else:
         train_data = AdlDatasetV2('train')
         train_dataloader = DataLoader(train_data, batch_size=args.bs,
-                                      shuffle=True, num_workers=2,
+                                      shuffle=True, num_workers=4,
                                       pin_memory=True)
         
 
         val_data = AdlDatasetV2('val')
         val_dataloader = DataLoader(val_data,
                                     batch_size=args.bs,
-                                    shuffle=True, num_workers=2,
+                                    shuffle=True, num_workers=4,
                                     pin_memory=True)
     
     optimizer = optim.Adam(model.parameters(),
@@ -195,8 +195,8 @@ def train(train_dataloader, model, criterion, optimizer, epoch, train_args):
 
 def val(val_dataloader, model, criterion, epoch, write_val):
     model.eval()
-    val_loss = AverageMeter()
-    iou_recorder=AverageMeter()
+    total_val_loss=0
+    total_iou=0
     num_correct=0
     iou_threshold=0.5
     len_dataset=len(val_dataloader.dataset)
@@ -227,10 +227,9 @@ def val(val_dataloader, model, criterion, epoch, write_val):
         #                  mask.flatten())
         # print(f'outputs size {outputs.shape},  mask size: {mask.shape}')
         loss,iou = criterion(outputs, nao_bbox_gt)
-        num_correct+=torch.sum(iou>iou_threshold)
-
-        val_loss.update(loss.item(), n)
-        iou_recorder.update(torch.sum(iou).item(),n)
+        num_correct+=torch.sum(iou>iou_threshold).item()
+        total_val_loss+=loss.item()
+        total_iou+=torch.sum(iou).item()
         del outputs, nao_bbox_gt
     
     # acc_, precision, recall, f1_score_ = compute_metrics(predictions_all,
@@ -239,12 +238,14 @@ def val(val_dataloader, model, criterion, epoch, write_val):
     # print(f'[epoch {epoch}], [val loss {val_loss.avg:5f}], [acc {acc_:5f}], '
     #       f'[precision {precision:5f}], [recall {recall:5f}], '
     #       f'[f1_score {f1_score_:5f}]')
-    print(f'[epoch {epoch}], [val loss {val_loss.avg:5f}], [IOU avg {iou_recorder.avg:5f}], [acc avg {num_correct/len_dataset}]')
+    val_loss_avg=total_val_loss/len_dataset
+    iou_avg=total_iou/len_dataset
+    print(f'[epoch {epoch}], [val loss {val_loss_avg:5f}], [IOU avg {iou_avg:5f}], [acc avg {num_correct/len_dataset}]')
 
     # write_val.writelines(f"[epoch {epoch}], "
     #                      f"[acc {acc_:5f}], [precision {precision:5f}], "
     #                      f"[recall {recall:5f}], [f1_score {f1_score_:5f}]]\n")
-    write_val.writelines(f"[epoch {epoch}], [IOU avg {iou_recorder.avg:5f}],[acc avg {num_correct/len_dataset}] \n")
+    write_val.writelines(f"[epoch {epoch}], [IOU avg {iou_avg:5f}],[acc avg {num_correct/len_dataset}] \n")
     
     # writer_val.add_scalar('val_loss', val_loss.avg, epoch)
     # writer_val.add_scalar('acc', acc_, epoch)
@@ -254,7 +255,7 @@ def val(val_dataloader, model, criterion, epoch, write_val):
 
     model.train()
     
-    return val_loss.avg
+    return val_loss_avg
 
 
 if __name__ == '__main__':

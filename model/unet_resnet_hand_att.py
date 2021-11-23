@@ -43,10 +43,13 @@ class UNetResnetHandAtt(nn.Module):
                                  nn.ReLU(),
                                  nn.Conv2d(64, n_classes, kernel_size=1,
                                            stride=1))
-        self.bbox_model=nn.Sequential(nn.MaxPool2d((4,4)),
+        self.bbox_model=nn.Sequential(nn.ReLU(),
+                                      nn.Conv2d(n_classes,n_classes,kernel_size=2,stride=2),
+                                      nn.AvgPool2d((4,4)),
+                                      nn.ReLU(),
                                       nn.Flatten(1),
-                                      nn.Linear(35840,4096),
-                                      nn.Linear(4096,4))
+                                      nn.Linear(2240,4)
+                                      )
     
     def forward(self, x, hand_x):
         _, f1 = self.base_model(x, with_output_feature_map=True)
