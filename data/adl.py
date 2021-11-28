@@ -331,12 +331,10 @@ if __name__ == '__main__':
     # for data in train_dataloader:
     it=iter(train_dataloader)
     nao_bbox_list=[]
-    img,nao_bbox,hand_hm=next(it)
-    nao_bbox_list.append(nao_bbox)
-    nao_bbox_list.append(nao_bbox)
-    print(nao_bbox.shape)
-    nao_bbox_total=torch.cat(nao_bbox_list,0)
-    print(nao_bbox_total.shape)
+    img,mask,hand_hm=next(it)
+    mask_s=(mask.data.cpu().squeeze(0))
+    print(mask.shape)
+    print(mask_s.shape)
     # train_dataset.data.to_csv('/media/luohwu/T7/dataset/ADL/test.csv',index=False)
     # for i in range(100):
     #     img, mask, hand_hm = train_dataset.__getitem__(i)

@@ -28,7 +28,7 @@ parser.add_argument('--exp_name', default='exp_name', type=str,
 
 parser.add_argument('--img_size', default=[256, 456],  # [482, 642]
                     help='image size: [H, W]')  #
-parser.add_argument('--img_resize', default=[224, 320],  # default=[242, 322]
+parser.add_argument('--img_resize', default=[224, 224],  # default=[242, 322]
                     help='image resize: [H, W]')  #
 parser.add_argument('--normalize', default=True, help='subtract mean value')
 parser.add_argument('--crop', default=False, help='')
@@ -43,11 +43,11 @@ parser.add_argument('--gpu_ids', default=None, type=str,
 parser.add_argument('--debug', default=False, help='debug')
 parser.add_argument('--print_every', type=int, default=10)
 
-parser.add_argument('--bs', default=32, type=int, help='batch size')
+parser.add_argument('--bs', default=12, type=int, help='batch size')
 parser.add_argument('--epochs', default=5000, type=int, help='Number of epochs')
 # parser.add_argument('--lr', default=0.000002, type=float, help='learning rate')
 # parser.add_argument('--lr', default=0.0000002, type=float, help='learning rate')
-parser.add_argument('--lr', default=0.0003, type=float, help='learning rate')
+parser.add_argument('--lr', default=0.000001, type=float, help='learning rate')
 parser.add_argument('--momentum', default=0.9, help='momentum')
 parser.add_argument('--weight_decay', default=0.0005, help='weight decay')
 
