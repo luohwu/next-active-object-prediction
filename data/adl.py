@@ -129,7 +129,13 @@ def check_data_annos(args):
 def make_sequence_dataset(mode='train'):
 
     #val is the same as test
-    par_video_id_list=train_video_id if mode=='train' else test_video_id
+    if mode=='all':
+        par_video_id_list=ids_adl
+    elif mode=='train':
+        par_video_id_list = train_video_id
+    else:
+        par_video_id_list = test_video_id
+    # par_video_id_list=train_video_id if mode=='train' else test_video_id
 
     print(f'start load {mode} data, size: {len(par_video_id_list)}')
     df_items = pd.DataFrame()

@@ -1,5 +1,15 @@
+from comet_ml import Experiment
 import numpy as np
 import torch
+# import comet_ml at the top of your file
+from comet_ml import Experiment
+
+# Create an experiment with your api key
+experiment = Experiment(
+    api_key="wU5pp8GwSDAcedNSr68JtvCpk",
+    project_name="audio-urbansound8k",
+    workspace="thesisproject",
+)
 
 
 # confusion matrix
@@ -41,80 +51,79 @@ def compute_metrics_v2(predictions, targets, num_classes=2):
     return acc, precision, recall, f1_score
 
 
-# 语义分割的评价指标
-def evaluate(predictions, targets, num_classes):
-    hist = np.zeros((num_classes, num_classes))
-    for lp, lt in zip(predictions, targets):
-        hist += _fast_hist(lp.flatten(), lt.flatten(), num_classes)
-    # axis 0: gt, axis 1: prediction
-    acc = np.diag(hist).sum() / hist.sum()  # 所有类别分类正确的acc
-    acc_cls = np.diag(hist) / hist.sum(axis=1)
-    acc_cls = np.nanmean(acc_cls)  # 忽略acc_cls的nan
-    iu = np.diag(hist) / (hist.sum(axis=1) + hist.sum(axis=0) - np.diag(hist))
-    mean_iu = np.nanmean(iu)
-    freq = hist.sum(axis=1) / hist.sum()
-    fwavacc = (freq[freq > 0] * iu[freq > 0]).sum()
+# def evaluate(predictions, targets, num_classes):
+#     hist = np.zeros((num_classes, num_classes))
+#     for lp, lt in zip(predictions, targets):
+#         hist += _fast_hist(lp.flatten(), lt.flatten(), num_classes)
+#     # axis 0: gt, axis 1: prediction
+#     acc = np.diag(hist).sum() / hist.sum()  # 所有类别分类正确的acc
+#     acc_cls = np.diag(hist) / hist.sum(axis=1)
+#     acc_cls = np.nanmean(acc_cls)  # 忽略acc_cls的nan
+#     iu = np.diag(hist) / (hist.sum(axis=1) + hist.sum(axis=0) - np.diag(hist))
+#     mean_iu = np.nanmean(iu)
+#     freq = hist.sum(axis=1) / hist.sum()
+#     fwavacc = (freq[freq > 0] * iu[freq > 0]).sum()
+#
+#     return acc, acc_cls, mean_iu, fwavacc
 
-    return acc, acc_cls, mean_iu, fwavacc
 
-
-class Evaluator(object):
-    def __init__(self, gt_image, pre_image, num_class=2):
-        self.gt_image = gt_image
-        self.pre_image = pre_image
-        self.num_class = num_class
-        self.confusion_matrix = np.zeros((self.num_class,) * 2)
-
-    def pixel_accuracy(self):
-        acc_pa = np.diag(
-            self.confusion_matrix).sum() / self.confusion_matrix.sum()
-        return acc_pa
-
-    def pixel_accuracy_class(self):
-        acc_mpa = np.diag(self.confusion_matrix) / self.confusion_matrix.sum(
-            axis=1)
-        acc_mpa = np.nanmean(acc_mpa)
-        return acc_mpa
-
-    def mean_intersection_over_union(self):
-        mIoU = np.diag(self.confusion_matrix) / (
-                np.sum(self.confusion_matrix, axis=1) +
-                np.sum(self.confusion_matrix, axis=0) -
-                np.diag(self.confusion_matrix))
-        mIoU = np.nanmean(mIoU)
-        return mIoU
-
-    def frequency_weighted_intersection_over_union(self):
-        freq = np.sum(self.confusion_matrix, axis=1) / np.sum(
-            self.confusion_matrix)
-        iu = np.diag(self.confusion_matrix) / (
-                np.sum(self.confusion_matrix, axis=1) +
-                np.sum(self.confusion_matrix, axis=0) -
-                np.diag(self.confusion_matrix))
-
-        fwIoU = (freq[freq > 0] * iu[freq > 0]).sum()
-        return fwIoU
-
-    def _generate_matrix(self):
-        mask = (self.gt_image >= 0) & (self.gt_image < self.num_class)
-        label = self.num_class * self.gt_image[mask].astype('int') \
-                + self.pre_image[mask]
-        count = np.bincount(label, minlength=self.num_class ** 2)
-        confusion_matrix = count.reshape(self.num_class, self.num_class)
-        return confusion_matrix
-
-    def add_batch(self):
-        assert self.gt_image.shape == self.pre_image.shape
-        self.confusion_matrix += self._generate_matrix()
-
-    def reset(self):
-        self.confusion_matrix = np.zeros((self.num_class,) * 2)
-
-    def evaluate(self):
-        return self.pixel_accuracy(), self.pixel_accuracy_class(), \
-               self.mean_intersection_over_union(), \
-               self.frequency_weighted_intersection_over_union()
-
+# class Evaluator(object):
+#     def __init__(self, gt_image, pre_image, num_class=2):
+#         self.gt_image = gt_image
+#         self.pre_image = pre_image
+#         self.num_class = num_class
+#         self.confusion_matrix = np.zeros((self.num_class,) * 2)
+#
+#     def pixel_accuracy(self):
+#         acc_pa = np.diag(
+#             self.confusion_matrix).sum() / self.confusion_matrix.sum()
+#         return acc_pa
+#
+#     def pixel_accuracy_class(self):
+#         acc_mpa = np.diag(self.confusion_matrix) / self.confusion_matrix.sum(
+#             axis=1)
+#         acc_mpa = np.nanmean(acc_mpa)
+#         return acc_mpa
+#
+#     def mean_intersection_over_union(self):
+#         mIoU = np.diag(self.confusion_matrix) / (
+#                 np.sum(self.confusion_matrix, axis=1) +
+#                 np.sum(self.confusion_matrix, axis=0) -
+#                 np.diag(self.confusion_matrix))
+#         mIoU = np.nanmean(mIoU)
+#         return mIoU
+#
+#     def frequency_weighted_intersection_over_union(self):
+#         freq = np.sum(self.confusion_matrix, axis=1) / np.sum(
+#             self.confusion_matrix)
+#         iu = np.diag(self.confusion_matrix) / (
+#                 np.sum(self.confusion_matrix, axis=1) +
+#                 np.sum(self.confusion_matrix, axis=0) -
+#                 np.diag(self.confusion_matrix))
+#
+#         fwIoU = (freq[freq > 0] * iu[freq > 0]).sum()
+#         return fwIoU
+#
+#     def _generate_matrix(self):
+#         mask = (self.gt_image >= 0) & (self.gt_image < self.num_class)
+#         label = self.num_class * self.gt_image[mask].astype('int') \
+#                 + self.pre_image[mask]
+#         count = np.bincount(label, minlength=self.num_class ** 2)
+#         confusion_matrix = count.reshape(self.num_class, self.num_class)
+#         return confusion_matrix
+#
+#     def add_batch(self):
+#         assert self.gt_image.shape == self.pre_image.shape
+#         self.confusion_matrix += self._generate_matrix()
+#
+#     def reset(self):
+#         self.confusion_matrix = np.zeros((self.num_class,) * 2)
+#
+#     def evaluate(self):
+#         return self.pixel_accuracy(), self.pixel_accuracy_class(), \
+#                self.mean_intersection_over_union(), \
+#                self.frequency_weighted_intersection_over_union()
+#
 
 # AP
 def compute_ap(recall, precision, use_11_points=False):
@@ -162,6 +171,9 @@ def compute_ap(recall, precision, use_11_points=False):
     return ap
 
 
+# [ TP ,  FN
+#   FP ,  TF]
+
 def confusion_matrix(pred, target, num_classes=2):
     con_mat = np.zeros((num_classes, num_classes))
     con_mat[0][0] = (pred * target).sum()
@@ -183,6 +195,7 @@ def compute_metrics(predictions, targets, num_classes=2):
     hist = np.zeros((num_classes, num_classes))
     for lp, lt in zip(predictions, targets):
         hist += confusion_matrix(lp, lt.numpy())
+    experiment.log_confusion_matrix(labels=["active","passive"],matrix=hist)
 
     acc = np.diag(hist).sum() / hist.sum()  # pixel accurency
     precision = (np.diag(hist) / hist.sum(axis=0))[0]  # active
@@ -202,86 +215,99 @@ def compute_metrics(predictions, targets, num_classes=2):
     return acc, precision, recall, f1_score
 
 
-def voc_ap(rec, prec, use_07_metric=False):
-    """Compute VOC AP given precision and recall. If use_07_metric is true, uses
-    the VOC 07 11-point method (default:False).
-    """
-    if use_07_metric:  # 使用07年方法
-        # 11 个点
-        ap = 0.
-        for t in np.arange(0., 1.1, 0.1):
-            if np.sum(rec >= t) == 0:
-                p = 0
-            else:
-                p = np.max(prec[rec >= t])  # 插值
-            ap = ap + p / 11.
-    else:  # 新方式，计算所有点
-        # correct AP calculation
-        # first append sentinel values at the end
-        mrec = np.concatenate(([0.], rec, [1.]))
-        mpre = np.concatenate(([0.], prec, [0.]))
-
-        # compute the precision 曲线值（也用了插值）
-        for i in range(mpre.size - 1, 0, -1):
-            mpre[i - 1] = np.maximum(mpre[i - 1], mpre[i])
-
-        # to calculate area under PR curve, look for points
-        # where X axis (recall) changes value
-        i = np.where(mrec[1:] != mrec[:-1])[0]
-
-        # and sum (\Delta recall) * prec
-        ap = np.sum((mrec[i + 1] - mrec[i]) * mpre[i + 1])
-    return ap
-
-
-def voc_ap2(rec, prec):
-    rec.insert(0, 0.0)  # insert 0.0 at begining of list
-    rec.append(1.0)  # insert 1.0 at end of list
-    mrec = rec[:]
-    prec.insert(0, 0.0)  # insert 0.0 at begining of list
-    prec.append(0.0)  # insert 0.0 at end of list
-    mpre = prec[:]
-
-    """
-     This part makes the precision monotonically decreasing
-        (goes from the end to the beginning)
-        matlab: for i=numel(mpre)-1:-1:1
-                    mpre(i)=max(mpre(i),mpre(i+1));
-    """
-    # matlab indexes start in 1 but python in 0, so I have to do:
-    #     range(start=(len(mpre) - 2), end=0, step=-1)
-    # also the python function range excludes the end, resulting in:
-    #     range(start=(len(mpre) - 2), end=-1, step=-1)
-    for i in range(len(mpre) - 2, -1, -1):
-        mpre[i] = max(mpre[i], mpre[i + 1])
-    """
-     This part creates a list of indexes where the recall changes
-        matlab: i=find(mrec(2:end)~=mrec(1:end-1))+1;
-    """
-    i_list = []
-    for i in range(1, len(mrec)):
-        if mrec[i] != mrec[i - 1]:
-            i_list.append(i)  # if it was matlab would be i + 1
-    """
-     The Average Precision (AP) is the area under the curve
-        (numerical integration)
-        matlab: ap=sum((mrec(i)-mrec(i-1)).*mpre(i));
-    """
-    ap = 0.0
-    for i in i_list:
-        ap += ((mrec[i] - mrec[i - 1]) * mpre[i])
-    return ap, mrec, mpre
+# def voc_ap(rec, prec, use_07_metric=False):
+#     """Compute VOC AP given precision and recall. If use_07_metric is true, uses
+#     the VOC 07 11-point method (default:False).
+#     """
+#     if use_07_metric:  # 使用07年方法
+#         # 11 个点
+#         ap = 0.
+#         for t in np.arange(0., 1.1, 0.1):
+#             if np.sum(rec >= t) == 0:
+#                 p = 0
+#             else:
+#                 p = np.max(prec[rec >= t])  # 插值
+#             ap = ap + p / 11.
+#     else:  # 新方式，计算所有点
+#         # correct AP calculation
+#         # first append sentinel values at the end
+#         mrec = np.concatenate(([0.], rec, [1.]))
+#         mpre = np.concatenate(([0.], prec, [0.]))
+#
+#         # compute the precision 曲线值（也用了插值）
+#         for i in range(mpre.size - 1, 0, -1):
+#             mpre[i - 1] = np.maximum(mpre[i - 1], mpre[i])
+#
+#         # to calculate area under PR curve, look for points
+#         # where X axis (recall) changes value
+#         i = np.where(mrec[1:] != mrec[:-1])[0]
+#
+#         # and sum (\Delta recall) * prec
+#         ap = np.sum((mrec[i + 1] - mrec[i]) * mpre[i + 1])
+#     return ap
 
 
-def my_compute_ap(r_all, p_all):
-    import pandas as pd
-    rp = pd.DataFrame([r_all, p_all]).transpose()
-    rp.columns = ['r', 'p']
+# def voc_ap2(rec, prec):
+#     rec.insert(0, 0.0)  # insert 0.0 at begining of list
+#     rec.append(1.0)  # insert 1.0 at end of list
+#     mrec = rec[:]
+#     prec.insert(0, 0.0)  # insert 0.0 at begining of list
+#     prec.append(0.0)  # insert 0.0 at end of list
+#     mpre = prec[:]
+#
+#     """
+#      This part makes the precision monotonically decreasing
+#         (goes from the end to the beginning)
+#         matlab: for i=numel(mpre)-1:-1:1
+#                     mpre(i)=max(mpre(i),mpre(i+1));
+#     """
+#     # matlab indexes start in 1 but python in 0, so I have to do:
+#     #     range(start=(len(mpre) - 2), end=0, step=-1)
+#     # also the python function range excludes the end, resulting in:
+#     #     range(start=(len(mpre) - 2), end=-1, step=-1)
+#     for i in range(len(mpre) - 2, -1, -1):
+#         mpre[i] = max(mpre[i], mpre[i + 1])
+#     """
+#      This part creates a list of indexes where the recall changes
+#         matlab: i=find(mrec(2:end)~=mrec(1:end-1))+1;
+#     """
+#     i_list = []
+#     for i in range(1, len(mrec)):
+#         if mrec[i] != mrec[i - 1]:
+#             i_list.append(i)  # if it was matlab would be i + 1
+#     """
+#      The Average Precision (AP) is the area under the curve
+#         (numerical integration)
+#         matlab: ap=sum((mrec(i)-mrec(i-1)).*mpre(i));
+#     """
+#     ap = 0.0
+#     for i in i_list:
+#         ap += ((mrec[i] - mrec[i - 1]) * mpre[i])
+#     return ap, mrec, mpre
+#
+#
+# def my_compute_ap(r_all, p_all):
+#     import pandas as pd
+#     rp = pd.DataFrame([r_all, p_all]).transpose()
+#     rp.columns = ['r', 'p']
+#
+#     ap_tmp = []
+#     r_step = [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
+#     for i in range(10):
+#         tmp = rp[(rp['r'] > r_step[i]) & (rp['r'] <= r_step[i + 1])]
+#         ap_tmp.append(tmp['p'].mean())
+#
+#     return np.nanmean(np.array(ap_tmp))
 
-    ap_tmp = []
-    r_step = [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
-    for i in range(10):
-        tmp = rp[(rp['r'] > r_step[i]) & (rp['r'] <= r_step[i + 1])]
-        ap_tmp.append(tmp['p'].mean())
 
-    return np.nanmean(np.array(ap_tmp))
+if __name__=='__main__':
+    prediction_list=[]
+    target_list=[]
+    for i in range(3):
+        prediction=torch.randint(0,2,[4,224,320])
+        target=torch.randint(0,2,[4,224,320])
+        prediction_list.append(prediction)
+        target_list.append(target)
+    print(compute_metrics(prediction_list,target_list,num_classes=2))
+
+    print(compute_metrics_v2(prediction_list,target_list,num_classes=2))

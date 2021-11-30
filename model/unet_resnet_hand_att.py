@@ -72,3 +72,4 @@ if __name__ == '__main__':
     
     out = model(input, feature_h)
     # out = model(input)
+    print(out.shape)

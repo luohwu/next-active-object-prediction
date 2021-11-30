@@ -3,6 +3,7 @@
 # @Email : jingjingjiang2017@gmail.com 
 
 import os
+from comet_ml import Experiment
 from datetime import datetime
 
 import torch.cuda
@@ -19,7 +20,12 @@ from opt import *
 import tarfile
 from metrics.CIOU import CIOU_LOSS
 
-
+experiment = Experiment(
+    api_key="wU5pp8GwSDAcedNSr68JtvCpk",
+    project_name="baseline",
+    workspace="thesisproject",
+    auto_metric_logging=False
+)
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 
@@ -57,24 +63,28 @@ def main():
     
     if args.dataset == 'EPIC':
         train_data = EpicDatasetV2('train')
+        val_data = EpicDatasetV2('val')
         train_dataloader = DataLoader(train_data, batch_size=args.bs,
                                       shuffle=True, num_workers=2,
                                       pin_memory=True)
         
 
-        val_data = EpicDatasetV2('val')
         val_dataloader = DataLoader(val_data,
                                     batch_size=args.bs,
                                     shuffle=True, num_workers=2,
                                     pin_memory=True)
     else:
-        train_data = AdlDatasetV2('train')
+        if args.original_split:
+            train_data = AdlDatasetV2('train')
+            val_data = AdlDatasetV2('val')
+        else:
+            all_data=AdlDatasetV2('all')
+            train_data,val_data=torch.utils.data.random_split(all_data,[1765,452])
         train_dataloader = DataLoader(train_data, batch_size=args.bs,
-                                      shuffle=True, num_workers=4,
-                                      pin_memory=True)
+                                          shuffle=True, num_workers=4,
+                                          pin_memory=True)
         
 
-        val_data = AdlDatasetV2('val')
         val_dataloader = DataLoader(val_data,
                                     batch_size=args.bs,
                                     shuffle=True, num_workers=4,
@@ -105,7 +115,7 @@ def main():
     # criterion=CIOU_LOSS()
     # criterion = FocalLoss()
     
-    train_args['ckpt_path'] = os.path.join(train_args['exp_path'],
+    train_args['ckpt_path'] = os.path.join(train_args['exp_path'],args.dataset,
                                            exp_name, 'ckpts/')
     if not os.path.exists(train_args['ckpt_path']):
         os.mkdir(train_args['ckpt_path'])
@@ -115,23 +125,24 @@ def main():
     train_loss_list=[]
     val_loss_list=[]
     current_epoch = 0
-    epoch_save=50 if args.dataset=='EPIC' else 200
+    epoch_save=50 if args.dataset=='EPIC' else 50
     for epoch in range(current_epoch + 1, train_args['epochs'] + 1):
         print(f"==================epoch :{epoch}/{train_args['epochs']}===============================================")
-        train_loss = train(train_dataloader, model, criterion, optimizer, epoch, train_args)
         val_loss = val(val_dataloader, model, criterion, epoch, write_val)
+
+        train_loss = train(train_dataloader, model, criterion, optimizer, epoch, train_args)
+
         scheduler.step(val_loss)
-        train_loss_list.append(train_loss)
-        val_loss_list.append(val_loss)
         if epoch % epoch_save==0:
             checkpoint_path=os.path.join(train_args['ckpt_path'],f'model_epoch_{epoch}.pth')
             torch.save({'epoch':epoch,
                         'model_state_dict':model.state_dict(),
-                        'optimizer_state_dict':optimizer.state_dict(),
-                        'val_loss_list':val_loss_list,
-                        'train_loss_list':train_loss_list},
+                        'optimizer_state_dict':optimizer.state_dict()},
                        checkpoint_path)
         print(f'train loss: {train_loss:.8f} | val loss:{val_loss:.8f}')
+        experiment.log_metric("train loss", train_loss, step=epoch)
+        experiment.log_metric("val loss", val_loss, step=epoch)
+
         # print(f"==================epoch :{epoch}/{train_args['epochs']+1}===============================================")
 
 
@@ -146,9 +157,8 @@ def train(train_dataloader, model, criterion, optimizer, epoch, train_args):
     for i, data in enumerate(train_dataloader, start=1):
         img, mask, hand_hm = data
         # img = Variable(img.float().cuda(args.device_ids[0]))
-        img = Variable(img.float().to(device))
-        # hand_hm = Variable(hand_hm.float().cuda(args.device_ids[0]))
-        hand_hm = Variable(hand_hm.float().to(device))
+        img=img.float().to(device)
+        hand_hm=hand_hm.float().to(device)
         # forward
         outputs = model(img, hand_hm)
         # print(f'output size:{outputs.shape}')
@@ -181,6 +191,7 @@ def train(train_dataloader, model, criterion, optimizer, epoch, train_args):
     #           f"[train loss {train_losses / i:5f}]")
 
 
+
 def val(val_dataloader, model, criterion, epoch, write_val):
     model.eval()
     val_loss = AverageMeter()
@@ -191,19 +202,21 @@ def val(val_dataloader, model, criterion, epoch, write_val):
         img, mask, hand_hm = data
         n = img.size(0)
         # img = Variable(img.float().cuda(args.device_ids[0]))
-        img = Variable(img.float().to(device))
+        # img = Variable(img.float().to(device))
+        img=img.float().to(device)
         # hand_hm = Variable(hand_hm.float().cuda(args.device_ids[0]))
-        hand_hm = Variable(hand_hm.float().to(device))
+        # hand_hm = Variable(hand_hm.float().to(device))
+        hand_hm=hand_hm.float().to(device)
         # mask = mask.long().cuda(args.device_ids[0])
         mask = mask.long().to(device)
         # forward
         outputs = model(img, hand_hm)
         # outputs = model(hand_hm)
         del img, hand_hm
-        # print(f'output.data size : {outputs.data.shape}')
-        predictions_all.append(outputs.data.max(1)[1].cpu().numpy())
-        # print(f'output.data selected size : {outputs.data.max(1)[1].shape}')
-        # print(f'{type(mask)}')
+
+        predictions_all.append(outputs.data.max(1)[1].cpu().numpy()) #outputs.data.max(1)[1] of shape [Batch_size, height, width]
+
+        #works when batch_size=1
         targets_all.append(mask.data.cpu().squeeze(0))
 
         # loss = criterion(outputs.permute(0, 2, 3, 1).reshape([-1, 2]),
@@ -216,6 +229,9 @@ def val(val_dataloader, model, criterion, epoch, write_val):
 
     acc_, precision, recall, f1_score_ = compute_metrics(predictions_all,
                                                          targets_all)
+    experiment.log_metric("val_acc_avg", acc_, step=epoch)
+    experiment.log_metric("val_f1_avg", f1_score_, step=epoch)
+
     del targets_all, predictions_all
     print(f'[epoch {epoch}], [val loss {val_loss.avg:5f}], [acc {acc_:5f}], '
           f'[precision {precision:5f}], [recall {recall:5f}], '

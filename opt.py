@@ -10,8 +10,10 @@ parser = argparse.ArgumentParser(description='training parameters')
 
 parser.add_argument('--dataset', type=str, default='ADL',
                     help='EPIC or ADL')
+parser.add_argument('--original_split', default=False, action="store_true",
+                    help='original train/test split or split after mixing')
 
-parser.add_argument('--euler', default=False,type=bool,
+parser.add_argument('--euler', default=False,action="store_true",
                     help='runing on euler or local computer')
 
 # parser.add_argument('--data_path',
