@@ -28,7 +28,7 @@ experiment = Experiment(
 )
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-
+experiment.log_parameters(args.__dict__)
 SEED = 0
 torch.manual_seed(SEED)
 torch.cuda.manual_seed(SEED)
@@ -44,7 +44,9 @@ TIMESTAMP = "{0:%Y-%m-%dT%H-%M-%S/}".format(datetime.now())
 
 multi_gpu = True if torch.cuda.device_count()>1 else False
 print(f'using {torch.cuda.device_count()} GPUs')
-# device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+print('current graphics card is:')
+os.system('lspci | grep VGA')
+
 device=torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 def main():
     model = UNetResnetHandAtt()
@@ -62,16 +64,20 @@ def main():
     model=model.to(device)
     
     if args.dataset == 'EPIC':
-        train_data = EpicDatasetV2('train')
-        val_data = EpicDatasetV2('val')
+        if args.original_split:
+            train_data = EpicDatasetV2('train')
+            val_data = EpicDatasetV2('val')
+        else:
+            all_data=EpicDatasetV2('all')
+            train_data, val_data=torch.utils.data.random_split(all_data,[8589,3000])
         train_dataloader = DataLoader(train_data, batch_size=args.bs,
-                                      shuffle=True, num_workers=2,
+                                      shuffle=True, num_workers=4,
                                       pin_memory=True)
         
 
         val_dataloader = DataLoader(val_data,
                                     batch_size=args.bs,
-                                    shuffle=True, num_workers=2,
+                                    shuffle=True, num_workers=4,
                                     pin_memory=True)
     else:
         if args.original_split:
@@ -79,7 +85,7 @@ def main():
             val_data = AdlDatasetV2('val')
         else:
             all_data=AdlDatasetV2('all')
-            train_data,val_data=torch.utils.data.random_split(all_data,[1765,452])
+            train_data,val_data=torch.utils.data.random_split(all_data,[1767,450])
         train_dataloader = DataLoader(train_data, batch_size=args.bs,
                                           shuffle=True, num_workers=4,
                                           pin_memory=True)
@@ -89,6 +95,8 @@ def main():
                                     batch_size=args.bs,
                                     shuffle=True, num_workers=4,
                                     pin_memory=True)
+
+    print(f'train data size: {len(train_data)}, val data size: {len(val_data)}')
     
     optimizer = optim.Adam(model.parameters(),
                            lr=args.lr,
@@ -99,7 +107,7 @@ def main():
                                                      factor=0.8,
                                                      patience=5,
                                                      verbose=True,
-                                                     min_lr=0.0000001)
+                                                     min_lr=0.000001)
     
     # if multi_gpu:
     #     optimizer = nn.DataParallel(optimizer)
@@ -125,12 +133,14 @@ def main():
     train_loss_list=[]
     val_loss_list=[]
     current_epoch = 0
-    epoch_save=50 if args.dataset=='EPIC' else 50
+    epoch_save=50 if args.dataset=='EPIC' else 200
     for epoch in range(current_epoch + 1, train_args['epochs'] + 1):
         print(f"==================epoch :{epoch}/{train_args['epochs']}===============================================")
-        val_loss = val(val_dataloader, model, criterion, epoch, write_val)
 
         train_loss = train(train_dataloader, model, criterion, optimizer, epoch, train_args)
+        val_loss = val(val_dataloader, model, criterion, epoch, write_val)
+
+
 
         scheduler.step(val_loss)
         if epoch % epoch_save==0:
@@ -140,8 +150,8 @@ def main():
                         'optimizer_state_dict':optimizer.state_dict()},
                        checkpoint_path)
         print(f'train loss: {train_loss:.8f} | val loss:{val_loss:.8f}')
-        experiment.log_metric("train loss", train_loss, step=epoch)
-        experiment.log_metric("val loss", val_loss, step=epoch)
+        experiment.log_metric("train_loss", train_loss, step=epoch)
+        experiment.log_metric("val_loss", val_loss, step=epoch)
 
         # print(f"==================epoch :{epoch}/{train_args['epochs']+1}===============================================")
 
@@ -152,6 +162,7 @@ def main():
 
 def train(train_dataloader, model, criterion, optimizer, epoch, train_args):
     train_losses = 0.
+    targets_all, predictions_all = [], []
     # curr_iter = (epoch - 1) * len(train_dataloader)
 
     for i, data in enumerate(train_dataloader, start=1):
@@ -164,6 +175,10 @@ def train(train_dataloader, model, criterion, optimizer, epoch, train_args):
         # print(f'output size:{outputs.shape}')
         # outputs = model(hand_hm)
         del img, hand_hm
+        predictions_all.append(outputs.data.max(1)[1].cpu().numpy())  # outputs.data.max(1)[1] of shape [Batch_size, height, width]
+
+        # works when batch_size=1
+        targets_all.append(mask.data.cpu().squeeze(0))
 
         # loss = criterion(outputs, mask.long().cuda(args.device_ids[0]))
         loss = criterion(outputs, mask.long().to(device))
@@ -184,6 +199,12 @@ def train(train_dataloader, model, criterion, optimizer, epoch, train_args):
 
         # curr_iter += 1
         # writer_train.add_scalar("train_loss", train_losses / i, curr_iter)
+    acc_, precision, recall, f1_score_ = compute_metrics(predictions_all,
+                                                         targets_all)
+    experiment.log_metric("train_acc_avg", acc_, step=epoch)
+    experiment.log_metric("train_f1_avg", f1_score_, step=epoch)
+
+    del targets_all, predictions_all
     return train_losses / len(train_dataloader)
     # print(f"[epoch {epoch}], avg train loss: {train_losses/len(train_dataloader):5f} ")
     # if i % train_args['print_every'] == 0:

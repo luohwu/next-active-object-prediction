@@ -30,7 +30,7 @@ parser.add_argument('--exp_name', default='exp_name', type=str,
 
 parser.add_argument('--img_size', default=[256, 456],  # [482, 642]
                     help='image size: [H, W]')  #
-parser.add_argument('--img_resize', default=[224, 224],  # default=[242, 322]
+parser.add_argument('--img_resize', default=[224, 320],  # default=[242, 322]
                     help='image resize: [H, W]')  #
 parser.add_argument('--normalize', default=True, help='subtract mean value')
 parser.add_argument('--crop', default=False, help='')

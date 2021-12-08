@@ -254,34 +254,37 @@ class AdlDatasetV2(Dataset):
     @staticmethod
     def generate_hand_hm(img, hand_bbox):
         hand_bbox=literal_eval(hand_bbox)
-        im = np.zeros((img.size[1], img.size[0]))
-
+        im = np.zeros((img.size[0], img.size[1]))
 
         if len(hand_bbox) > 0:
             points = []
             for box in hand_bbox:
                 points.append((box[0], box[1]))
                 # points.append((box[0], box[3]))
-                points.append((box[2], box[3]))
+                points.append((box[1], box[1]))
                 # points.append((box[1], box[3]))
             points = np.array(points).transpose()
-            im[(points[1]), (points[0])] = 1
+            im[(points[0]).astype(np.int), (points[1]).astype(np.int)] = 1
             im = ndimage.gaussian_filter(im, sigma=img.size[0] / (
                     4. * points.shape[1]))
-            im = (im - im.min())/(im.max() - im.min())
+            im = (im - im.min()) / (im.max() - im.min())
 
-        return im
+        return im.transpose()
+
 
     @staticmethod
-    def gen_static_hand_dm():  # 用平均值
-        im = np.zeros((1920, 1080))
-        points = [(865, 600), (1189, 600)]
+    def gen_static_hand_dm():  #
+        im = np.zeros((1280, 960))
+        points = [(459, 465), (896, 465)]
 
         points = np.array(points).transpose()
-        im[(points[0]), (points[1])] = 1
-        im = ndimage.gaussian_filter(im, sigma=1920 / (4. * points.shape[1]))
+        im[(points[0]).astype(np.int), (points[1]).astype(np.int)] = 1
+        im = ndimage.gaussian_filter(im, sigma=1280 / (4. * points.shape[1]))
         im = (im - im.min()) / (im.max() - im.min())
+
         return im.transpose()
+
+
 
     def generate_hms(self):
         hand_hms_dict = {}
@@ -304,11 +307,11 @@ class AdlDatasetV2(Dataset):
                                       self.args.img_resize[0]))
             hand_hms_dict[img_file] = hand_hm
 
-        save_file = open(os.path.join(self.args.data_path,
-                                      f'{self.args.mode}_hand_hms.pkl'),
-                         'wb')
-        pickle.dump(hand_hms_dict, save_file)
-        save_file.close()
+        # save_file = open(os.path.join(self.args.data_path,
+        #                               f'{self.args.mode}_hand_hms.pkl'),
+        #                  'wb')
+        # pickle.dump(hand_hms_dict, save_file)
+        # save_file.close()
 
 
 
