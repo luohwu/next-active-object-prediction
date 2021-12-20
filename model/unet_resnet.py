@@ -495,10 +495,10 @@ if __name__ == '__main__':
     from torchsummary import summary
     # model = resnet34()
     # summary(your_model, input_size=(channels, H, W))
-    # model = UNetResNet18()
+    model = UNetResNet18()
     # model = UNetVGG16()
     # model = ResNetEncoderDecoder()
-    model = UNetResNet18AdlDrop()
+    # model = UNetResNet18AdlDrop()
     # summary(model.cuda(), input_size=(3, 512, 512))
-    summary(model.cuda(), input_size=(3, 224, 320))  # 被32整除
+    summary(model.cuda(), input_size=(3, 224, 224))  # 被32整除
 

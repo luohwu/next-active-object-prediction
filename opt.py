@@ -46,6 +46,7 @@ parser.add_argument('--debug', default=False, help='debug')
 parser.add_argument('--print_every', type=int, default=10)
 
 parser.add_argument('--bs', default=12, type=int, help='batch size')
+parser.add_argument('--seed', default=0, type=int, help='random seed')
 parser.add_argument('--epochs', default=5000, type=int, help='Number of epochs')
 # parser.add_argument('--lr', default=0.000002, type=float, help='learning rate')
 # parser.add_argument('--lr', default=0.0000002, type=float, help='learning rate')

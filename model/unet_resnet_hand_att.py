@@ -21,6 +21,7 @@ class UNetResnetHandAtt(nn.Module):
     def __init__(self, n_classes=2):
         super(UNetResnetHandAtt, self).__init__()
         self.base_model = UNetResNet18()
+        # self.base_model.load_state_dict(torch.load('model/adl_model.pth',map_location='cpu'))
 
 
 
@@ -40,8 +41,9 @@ class UNetResnetHandAtt(nn.Module):
 
         x = self.att_block(hand_x, f1)
         x = self.out(torch.cat([f1, x], dim=1))
-
+        #
         return x
+        # return output
 
 
 if __name__ == '__main__':

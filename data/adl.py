@@ -11,7 +11,7 @@ from ast import literal_eval
 import numpy as np
 import pandas as pd
 import torch
-from PIL import Image
+from PIL import Image,ImageOps
 from scipy import ndimage
 from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms
@@ -31,7 +31,6 @@ import  cv2
 #                   'P02P02_07', 'P02P02_08', 'P02P02_09', }
 # train_video_id = {'P01P01_01', 'P01P01_02'}
 # val_video_id = {'P01P01_01'}
-
 
 def generate_pseudo_track_id(annos):
     video_id = annos.id[0]
@@ -184,6 +183,7 @@ def make_sequence_dataset(mode='train'):
 
 class AdlDatasetV2(Dataset):
     def __init__(self, mode='train'):
+        self.mode=mode
         self.args = args
         self.crop = transforms.RandomCrop((args.img_resize[0],
                                            args.img_resize[1]))
@@ -202,7 +202,8 @@ class AdlDatasetV2(Dataset):
             self.transform = transforms.Compose([  # [h, w]
                 transforms.ToTensor(),
                 transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                                     std=[0.229, 0.224, 0.225])  # ImageNet
+                                     std=[0.229, 0.224, 0.225])  # ImageNet,
+                # ,AddGaussianNoise(0., 0.5 if self.mode=='train' else 0)
             ])
         else:
             self.transform = transforms.Compose([
@@ -214,6 +215,7 @@ class AdlDatasetV2(Dataset):
 
         img_file = df_item.img_file
         img = Image.open(img_file).convert('RGB')
+
         # nao_bbox = [x1, y1, x2, y2]  bbox = df_item.nao_bbox
         mask = self.generate_mask(img, df_item.nao_bbox)
         mask = Image.fromarray(mask)
@@ -222,7 +224,9 @@ class AdlDatasetV2(Dataset):
         if df_item.hand_bbox is np.nan:
             hand_hm = self.static_hm
         else:
-            hand_hm = self.generate_hand_hm(img, df_item.hand_bbox)
+            hand_bbox=literal_eval(df_item.hand_bbox)
+            # print(hand_bbox)
+            hand_hm = self.generate_hand_hm(img, hand_bbox)
 
         hand_hm = Image.fromarray(hand_hm)
 
@@ -253,7 +257,7 @@ class AdlDatasetV2(Dataset):
 
     @staticmethod
     def generate_hand_hm(img, hand_bbox):
-        hand_bbox=literal_eval(hand_bbox)
+
         im = np.zeros((img.size[0], img.size[1]))
 
         if len(hand_bbox) > 0:

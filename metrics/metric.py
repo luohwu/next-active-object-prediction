@@ -5,11 +5,6 @@ import torch
 from comet_ml import Experiment
 
 # Create an experiment with your api key
-experiment = Experiment(
-    api_key="wU5pp8GwSDAcedNSr68JtvCpk",
-    project_name="audio-urbansound8k",
-    workspace="thesisproject",
-)
 
 
 # confusion matrix
@@ -175,6 +170,17 @@ def compute_ap(recall, precision, use_11_points=False):
 #   FP ,  TF]
 
 def confusion_matrix(pred, target, num_classes=2):
+    # print(f'shape of predict: {pred.shape}')
+    con_mat = np.zeros((num_classes, num_classes))
+    con_mat[0][0] = (pred * target).sum()
+    con_mat[0][1] = target.sum() - con_mat[0][0]
+    con_mat[1][0] = pred.sum() - con_mat[0][0]
+    con_mat[1][1] = ((pred - 1) * (target - 1)).sum()
+
+    return con_mat
+
+def compute_confusion_matrix(pred, target, num_classes=2):
+    # print(f'shape of predict: {pred.shape}')
     con_mat = np.zeros((num_classes, num_classes))
     con_mat[0][0] = (pred * target).sum()
     con_mat[0][1] = target.sum() - con_mat[0][0]
@@ -195,7 +201,6 @@ def compute_metrics(predictions, targets, num_classes=2):
     hist = np.zeros((num_classes, num_classes))
     for lp, lt in zip(predictions, targets):
         hist += confusion_matrix(lp, lt.numpy())
-    experiment.log_confusion_matrix(labels=["active","passive"],matrix=hist)
 
     acc = np.diag(hist).sum() / hist.sum()  # pixel accurency
     precision = (np.diag(hist) / hist.sum(axis=0))[0]  # active
@@ -214,6 +219,32 @@ def compute_metrics(predictions, targets, num_classes=2):
 
     return acc, precision, recall, f1_score
 
+def compute_metrics2(predictions, targets, num_classes=2):
+    """
+    compute metrics of active object
+    :param predictions:
+    :param targets:
+    :param num_classes:
+    :return:
+    """
+
+    bs=predictions.shape[0]
+    acc=np.empty(bs)
+    f1_score=np.empty(bs)
+
+    for i in range(bs):
+        confusion_matrix=compute_confusion_matrix(predictions[i],targets[i])
+        acc[i]=( np.diag(confusion_matrix).sum() / confusion_matrix.sum() )  # pixel accurency
+        f1_score[i]=(confusion_matrix[0][0]/(confusion_matrix[0][0]+0.5*(confusion_matrix[0][1]+confusion_matrix[1][0])) )
+
+        # precision = (np.diag(confusion_matrix) / confusion_matrix.sum(axis=0))[0]  # active
+        # acc_cls = np.nanmean(acc_cls)  # 忽略acc_cls的nan
+
+        # Recall
+        # recall = (np.diag(confusion_matrix) / confusion_matrix.sum(axis=1))[0]
+
+        # f1_score[i] = 2 * precision * recall / (precision + recall)
+    return acc, f1_score
 
 # def voc_ap(rec, prec, use_07_metric=False):
 #     """Compute VOC AP given precision and recall. If use_07_metric is true, uses
