@@ -49,7 +49,10 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 def main():
     model = UNetResnetHandAtt()
-    model.load_state_dict(torch.load('model/adl_model.pth',map_location='cpu')['net'])
+    if args.dataset=='ADL':
+        model.load_state_dict(torch.load('model/adl_model.pth', map_location='cpu')['net'])
+    else:
+        model.load_state_dict(torch.load('model/epic_model.pth', map_location='cpu')['net'])
     for p in model.parameters():
         p.requires_grad=False
     # for p in model.base_model.parameters():
